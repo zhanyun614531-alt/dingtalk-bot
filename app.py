@@ -55,20 +55,22 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
             send_official_message(error_msg, at_user_ids=at_user_ids)
             return
 
-        # 创建Agent并处理
         print("【异步任务】开始LLM处理...")
         start_time = time.time()
-        result = Test.smart_assistant(user_input)  # ✅ 赋值给 result
+        
+        # 添加更详细的调试
+        print("【异步任务】准备调用 Test.smart_assistant...")
+        result = Test.smart_assistant(user_input)
+        
         processing_time = time.time() - start_time
-        
         print(f"【异步任务】LLM处理完成，耗时: {processing_time:.1f}秒")
-        print(f"【异步任务】LLM返回: {result}")  # ✅ 改为 result
+        print(f"【异步任务】LLM返回类型: {type(result)}")
+        print(f"【异步任务】LLM返回内容: {result}")
         
-        if result:  # ✅ 改为 result
-            final_result = f"Test1：{result}"  # ✅ 改为 result，并避免变量名冲突
+        if result:
+            final_result = f"Test1：{result}"
             print(f"【异步任务】准备发送结果: {final_result[:100]}...")
             
-            # 发送结果到钉钉
             send_success = send_official_message(final_result, at_user_ids=at_user_ids)
             if send_success:
                 print("【异步任务】消息发送成功")
@@ -80,18 +82,25 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
             send_official_message(error_msg, at_user_ids=at_user_ids)
             
     except Exception as e:
+        # 更详细的错误信息
         error_msg = f"Test1：异步处理出错: {str(e)}"
         print(f"【异步任务错误】{error_msg}")
+        print(f"【异步任务错误类型】{type(e).__name__}")
+        
         import traceback
-        print(f"【错误详情】{traceback.format_exc()}")
+        full_traceback = traceback.format_exc()
+        print(f"【完整错误堆栈】\n{full_traceback}")
+        
+        # 检查错误信息中是否包含 'response'
+        if 'response' in str(e):
+            print("【关键发现】错误确实与 'response' 变量相关")
         
         # 尝试发送错误信息
         try:
             send_official_message(error_msg, at_user_ids=at_user_ids)
-        except:
-            print("【严重错误】连错误消息都无法发送")
+        except Exception as send_error:
+            print(f"【严重错误】连错误消息都无法发送: {send_error}")
     finally:
-        # 从处理中任务移除
         if conversation_id in processing_tasks:
             del processing_tasks[conversation_id]
         print(f"【异步任务】清理完成，会话ID: {conversation_id}")
