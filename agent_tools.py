@@ -63,35 +63,50 @@ class DeepseekAgent:
             return "计算失败"
 
     def send_qq_email(self, to, subject, body):
-        """发送QQ邮件"""
-        if not all([to, subject, body]):
-            return "收件人、主题或正文不能为空"
+    """发送邮件 - 使用 Resend HTTP API"""
+    if not all([to, subject, body]):
+        return "收件人、主题或正文不能为空"
 
-        # qq_user = os.environ.get("QQ_EMAIL_USER", "").strip()
-        # qq_auth_code = os.environ.get("QQ_EMAIL_AUTH_CODE", "").strip()
+    resend_api_key = os.environ.get("RESEND_API_KEY")
+    if not resend_api_key:
+        return "邮件服务未配置完成，请联系管理员添加RESEND_API_KEY"
 
-        # if not all([qq_user, qq_auth_code]):
-        #     return "请配置QQ邮箱信息"
+    try:
+        # 使用Resend的测试域名或验证你自己的域名
+        from_email = "onboarding@resend.dev"  # Resend提供的测试发件人
+        
+        data = {
+            "from": from_email,
+            "to": [to],
+            "subject": subject,
+            "html": f"<div style='font-family: Arial, sans-serif; line-height: 1.6; white-space: pre-line;'>{body}</div>",
+            "text": body
+        }
 
-        # try:
-        #     message = MIMEText(body, 'plain', 'utf-8')
-        #     message['From'] = qq_user
-        #     message['To'] = to
-        #     message['Subject'] = Header(subject, 'utf-8')
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json"
+            },
+            json=data,
+            timeout=30
+        )
 
-        #     server = smtplib.SMTP_SSL('smtp.qq.com', 465)
-        #     server.login(qq_user, qq_auth_code)
-        #     server.sendmail(qq_user, to, message.as_string())
-        #     server.quit()
-        #     return f"邮件发送成功！已发送至：{to}"
-        # except Exception as e:
-        #     return f"邮件发送失败：{str(e)}"
+        print(f"【Resend调试】状态码: {response.status_code}")
+        print(f"【Resend调试】响应: {response.text}")
 
-        # 模拟发送成功，实际不发送
-        print(f"【模拟发送】到: {to}, 主题: {subject}, 内容长度: {len(body)}")
-    
-        # 在实际环境中返回模拟成功消息
-        return f"【测试模式】邮件已模拟发送至：{to}\n主题：{subject}\n内容：{body[:100]}..."
+        if response.status_code == 200:
+            result = response.json()
+            return f"邮件发送成功！已发送至：{to}"
+        else:
+            error_detail = response.json().get('message', response.text)
+            return f"邮件发送失败：{error_detail}"
+
+    except Exception as e:
+        error_msg = f"邮件发送异常：{str(e)}"
+        print(f"【Resend错误】{error_msg}")
+        return error_msg
 
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取工具调用指令"""
