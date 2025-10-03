@@ -408,7 +408,25 @@ def test_module():
             "error": str(e),
             "traceback": full_traceback
         })
+
+@app.route('/test-smtp-connection')
+def test_smtp_connection():
+    """测试SMTP连接"""
+    try:
+        import socket
+        # 测试SMTP端口连接
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex(('smtp.qq.com', 465))
+        sock.close()
         
+        return jsonify({
+            "smtp_qq_465_connectable": result == 0,
+            "error_code": result
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
     port = int(os.getenv('DINGTALK_PORT', 5000))
