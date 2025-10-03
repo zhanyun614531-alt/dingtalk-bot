@@ -107,7 +107,7 @@ class DeepseekAgent:
         self.toolkit = Toolkit()
 
     def extract_tool_call(self, llm_response):
-    """从LLM响应中提取并验证工具调用指令"""
+        """从LLM响应中提取并验证工具调用指令"""
         print(f"【工具提取调试】开始提取，原始响应: '{llm_response}'")
     
         if not llm_response or not llm_response.strip():
