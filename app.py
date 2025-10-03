@@ -134,7 +134,7 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
         resp = requests.post(url, json=body, headers=headers)
         print(resp.text)
 
-        final_msg = re.sub(r'Test$', '', resp.text)
+        final_msg = re.sub(r'Test1$', '', resp.text)
         # logging.info(f"钉钉消息发送响应: {resp.text}")
         logging.info(f"钉钉消息发送响应: {final_msg}")
 
@@ -147,24 +147,24 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
 def process_command(command):
     """处理用户指令，支持多种功能"""
     original_msg = command.strip()
-    key = "Test"
+    key = "Test1"
     raw_command = re.sub(re.escape(key), '', original_msg)
     command = re.sub(r'\s', '', raw_command)
     # print(command)
     if not command:
-        return "请发送具体指令哦~ 支持的指令：\n- LLM"
+        return "Test1：请发送具体指令哦~ 支持的指令：\n- LLM"
     elif command == '时间':
-        return f"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        return f"Test1：当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
 
     elif command.startswith("LLM"):
         agent = Test.DeepseekAgent()
-        pure_command = re.sub(r'^Test\s*LLM\s*', '', command)
+        pure_command = re.sub(r'^Test1\s*LLM\s*', '', command)
         response = agent.process_input(pure_command)
-        return f"Test：{response}"
+        return f"Test1：{response}"
 
     # 未知指令
     else:
-        return f"暂不支持该指令：{command}\n发送「帮助」查看支持的功能"
+        return f"Test1：暂不支持该指令：{command}\n发送「帮助」查看支持的功能"
 
 # 【新增】根路径路由：用于返回请求方的IP（即你的Python代码出口IP）
 @app.route('/')  # 配置根路径
