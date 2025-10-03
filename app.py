@@ -409,23 +409,36 @@ def test_module():
             "traceback": full_traceback
         })
 
-@app.route('/test-smtp-connection')
-def test_smtp_connection():
-    """测试SMTP连接"""
-    try:
-        import socket
-        # 测试SMTP端口连接
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5)
-        result = sock.connect_ex(('smtp.qq.com', 465))
-        sock.close()
-        
-        return jsonify({
-            "smtp_qq_465_connectable": result == 0,
-            "error_code": result
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)})
+@app.route('/test-all-ports')
+def test_all_ports():
+    """测试所有可能的SMTP端口"""
+    import socket
+    
+    ports_to_test = [587, 465, 25, 80, 443]
+    results = {}
+    
+    for port in ports_to_test:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            result = sock.connect_ex(('smtp.qq.com', port))
+            sock.close()
+            
+            results[f"port_{port}"] = {
+                "connectable": result == 0,
+                "error_code": result
+            }
+        except Exception as e:
+            results[f"port_{port}"] = {
+                "connectable": False,
+                "error": str(e)
+            }
+    
+    return jsonify({
+        "host": "smtp.qq.com",
+        "port_test_results": results,
+        "note": "如果所有端口都不可用，请使用Resend等HTTP邮件服务"
+    })
 
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
