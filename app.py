@@ -11,7 +11,6 @@ import threading
 import time
 import logging
 import re
-# from llm_output import DeepseekAgent
 import Test
 
 # 加载环境变量（从.env文件读取API密钥等配置）
@@ -58,7 +57,6 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
 
         # 创建Agent并处理
         print("【异步任务】创建Agent实例...")
-        agent = Test.DeepseekAgent()
         
         print("【异步任务】开始LLM处理...")
         start_time = time.time()
