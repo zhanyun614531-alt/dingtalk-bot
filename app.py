@@ -333,13 +333,19 @@ def async_debug():
 def test_llm_direct():
     """直接测试LLM，绕过所有复杂逻辑"""
     try:
-        import openai
+        from openai import OpenAI  # ✅ 新版本导入
+        
+        # 创建客户端
+        client = OpenAI(
+            base_url="https://ark.cn-beijing.volces.com/api/v3/bots",
+            api_key=os.environ.get("ARK_API_KEY")
+        )
         
         # 简单直接的测试
         test_prompt = "2025年国庆假期法定节假日是什么时候？简要回答！"
         print(f"【直接测试】开始测试，提示: {test_prompt}")
         
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="bot-20250907084333-cbvff",
             messages=[
                 {"role": "user", "content": test_prompt}
@@ -349,20 +355,13 @@ def test_llm_direct():
         
         print(f"【直接测试】响应: {response}")
         
-        if hasattr(response, 'choices') and response.choices:
-            result = response.choices[0].message.content
-            return jsonify({
-                "status": "success",
-                "response": result,
-                "response_type": type(response).__name__,
-                "choices_count": len(response.choices)
-            })
-        else:
-            return jsonify({
-                "status": "error", 
-                "error": "No choices in response",
-                "response": str(response)
-            })
+        result = response.choices[0].message.content
+        return jsonify({
+            "status": "success",
+            "response": result,
+            "response_type": type(response).__name__,
+            "choices_count": len(response.choices)
+        })
             
     except Exception as e:
         return jsonify({
