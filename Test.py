@@ -31,7 +31,7 @@ class DeepseekAgent:
 规则：
 1. 需要调用工具时，返回```json和```包裹的JSON
 2. 不需要工具时，直接回答问题
-3. 用简洁明了的中文回答
+3. 用简洁明了的方式回答
 """
 
     def get_weather(self, city):
