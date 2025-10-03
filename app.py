@@ -62,7 +62,7 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
         
         print("【异步任务】开始LLM处理...")
         start_time = time.time()
-        response = agent.process_input(user_input)
+        result = Test.smart_assistant(user_input)
         processing_time = time.time() - start_time
         
         print(f"【异步任务】LLM处理完成，耗时: {processing_time:.1f}秒")
