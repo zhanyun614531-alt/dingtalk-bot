@@ -238,6 +238,33 @@ def get_ip():
         "headers": dict(request.headers)
     })
 
+@app.route('/server-ip')
+def get_server_ip():
+    """获取Render服务器的真实公网IP"""
+    try:
+        # 方法1: 通过外部API获取服务器出口IP
+        response = requests.get('https://httpbin.org/ip', timeout=10)
+        if response.status_code == 200:
+            server_ip = response.json()['origin']
+            return jsonify({
+                "render_server_public_ip": server_ip,
+                "note": "将此IP添加到钉钉白名单"
+            })
+    except Exception as e:
+        pass
+    
+    try:
+        # 方法2: 通过其他服务获取
+        response = requests.get('https://api.ipify.org?format=json', timeout=10)
+        if response.status_code == 200:
+            server_ip = response.json()['ip']
+            return jsonify({
+                "render_server_public_ip": server_ip,
+                "note": "将此IP添加到钉钉白名单"
+            })
+    except Exception as e:
+        return jsonify({"error": f"无法获取服务器IP: {str(e)}"})
+
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
     port = int(os.getenv('DINGTALK_PORT', 5000))
