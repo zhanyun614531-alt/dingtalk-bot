@@ -187,11 +187,9 @@ def process_command(command):
     elif command.startswith("LLM"):
         try:
             print(f"【调试】开始调用LLM，命令: '{command}'")
-            agent = Test.DeepseekAgent()
             pure_command = re.sub(r'^LLM', '', command).strip()
             print(f"【调试】LLM纯命令: '{pure_command}'")
-            
-            response = agent.process_input(pure_command)
+            response = Test.smart_assistant(pure_command)
             print(f"【调试】LLM返回: '{response}'")
             
             if response is None:
