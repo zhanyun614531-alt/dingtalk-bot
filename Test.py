@@ -106,21 +106,73 @@ class DeepseekAgent:
         self.memory = AgentMemory()
         self.toolkit = Toolkit()
 
-    def extract_tool_call(self, llm_response):
-        """从LLM响应中提取并验证工具调用指令"""
-        # ... 保持原有的extract_tool_call方法
+        def extract_tool_call(self, llm_response):
+        """从LLM响应中提取并验证工具调用指令（支持纯JSON和```json包裹的JSON）"""
+        # 新增调试打印：查看LLM响应的完整内容
+        print(f"【调试】待提取的LLM响应：{llm_response}")
+
+        tool_json = None
+        # 情况1：处理带```json包裹的JSON（按系统提示要求）
+        if "```" in llm_response:
+            parts = [p.strip() for p in llm_response.split("```") if p.strip()]
+            for part in parts:
+                if part.lower().startswith("json"):
+                    tool_json = part[4:].strip()  # 去掉"json"前缀
+                    break
+                if part.startswith("{") and part.endswith("}"):
+                    tool_json = part
+                    break
+        # 情况2：处理纯JSON（LLM未加包裹的情况，新增逻辑）
+        else:
+            # 检查是否是纯JSON（以{开头，以}结尾）
+            clean_response = llm_response.strip()
+            if clean_response.startswith("{") and clean_response.endswith("}"):
+                tool_json = clean_response
+
+        # 验证tool_json是否有效
+        if not tool_json:
+            print(
+                f"【调试】未提取到工具调用JSON，LLM响应：{llm_response[:100]}...")
+            return None
+        try:
+            tool_data = json.loads(tool_json)
+            print(f"【调试】成功提取工具调用数据：{tool_data}")  # 新增调试打印
+        except json.JSONDecodeError as e:
+            print(f"【调试】JSON解析错误：{tool_json}，错误：{str(e)}")
+            raise ValueError(f"JSON格式错误：{tool_json}，错误原因：{str(e)}")
+        if not isinstance(tool_data,
+                          dict) or "action" not in tool_data or "parameters" not in tool_data:
+            print(f"【调试】JSON缺少必要字段：{tool_data}")
+            raise ValueError(
+                f"JSON缺少必要字段，必须包含'action'和'parameters'：{tool_data}")
+        return tool_data
 
     def process_input(self, user_input):
     """处理用户输入，调用Agent并返回结果"""
     try:
-        print(f"【Test.py】开始处理: {user_input}")
+        print(f"【Test.py调试】开始处理: {user_input}")
         
+        # 检查环境变量
+        ark_key = os.environ.get("ARK_API_KEY")
+        if not ark_key:
+            error_msg = "ARK_API_KEY环境变量未设置"
+            print(f"【Test.py错误】{error_msg}")
+            return error_msg
+        
+        print(f"【Test.py调试】环境变量检查通过")
+        
+        # 添加用户消息到记忆
         self.memory.add_message("user", user_input)
         messages = self.memory.get_messages()
         
-        print("【Test.py】调用火山方舟API...")
+        print(f"【Test.py调试】消息数量: {len(messages)}")
+        for i, msg in enumerate(messages):
+            print(f"【Test.py调试】消息{i}: {msg['role']} - {msg['content'][:100]}...")
+        
+        print("【Test.py调试】开始调用火山方舟API...")
         start_time = time.time()
         
+        # 调用OpenAI API
         response = openai.ChatCompletion.create(
             model=self.model_id,
             messages=messages,
@@ -128,21 +180,46 @@ class DeepseekAgent:
         )
         
         processing_time = time.time() - start_time
-        llm_raw_response = response.choices[0].message.content.strip()
+        print(f"【Test.py调试】API调用完成，耗时: {processing_time:.1f}秒")
         
-        print(f"【Test.py】API调用成功，耗时: {processing_time:.1f}秒")
-        print(f"【Test.py】原始响应: {llm_raw_response[:200]}...")
+        # 详细检查响应结构
+        print(f"【Test.py调试】响应类型: {type(response)}")
+        print(f"【Test.py调试】响应内容: {response}")
         
+        # 检查响应中的choices
+        if hasattr(response, 'choices') and response.choices:
+            print(f"【Test.py调试】choices数量: {len(response.choices)}")
+            first_choice = response.choices[0]
+            print(f"【Test.py调试】第一个choice: {first_choice}")
+            
+            if hasattr(first_choice, 'message'):
+                llm_raw_response = first_choice.message.content.strip()
+                print(f"【Test.py调试】提取的响应内容: '{llm_raw_response}'")
+                print(f"【Test.py调试】响应内容长度: {len(llm_raw_response)}")
+            else:
+                print(f"【Test.py调试】choice中没有message属性")
+                llm_raw_response = ""
+        else:
+            print(f"【Test.py调试】响应中没有choices或choices为空")
+            llm_raw_response = ""
+        
+        if not llm_raw_response:
+            print(f"【Test.py调试】LLM返回了空内容，直接返回空")
+            return ""
+        
+        # 添加到记忆
         self.memory.add_message("assistant", llm_raw_response)
         
+        print(f"【Test.py调试】开始提取工具调用...")
         # 提取工具调用
         tool_data = self.extract_tool_call(llm_raw_response)
         if tool_data:
-            print(f"【Test.py】检测到工具调用: {tool_data['action']}")
+            print(f"【Test.py调试】检测到工具调用: {tool_data}")
             tool_result = self.toolkit.call_tool(tool_data["action"], tool_data["parameters"])
+            print(f"【Test.py调试】工具执行结果: {tool_result}")
             return tool_result
         else:
-            print("【Test.py】直接返回文本响应")
+            print(f"【Test.py调试】无工具调用，直接返回文本")
             return llm_raw_response
 
     except Exception as e:
