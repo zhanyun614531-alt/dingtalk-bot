@@ -56,22 +56,20 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
             return
 
         # 创建Agent并处理
-        print("【异步任务】创建Agent实例...")
-        
         print("【异步任务】开始LLM处理...")
         start_time = time.time()
-        result = Test.smart_assistant(user_input)
+        result = Test.smart_assistant(user_input)  # ✅ 赋值给 result
         processing_time = time.time() - start_time
         
         print(f"【异步任务】LLM处理完成，耗时: {processing_time:.1f}秒")
-        print(f"【异步任务】LLM返回: {response}")
+        print(f"【异步任务】LLM返回: {result}")  # ✅ 改为 result
         
-        if response:
-            result = f"Test1：{response}"
-            print(f"【异步任务】准备发送结果: {result[:100]}...")
+        if result:  # ✅ 改为 result
+            final_result = f"Test1：{result}"  # ✅ 改为 result，并避免变量名冲突
+            print(f"【异步任务】准备发送结果: {final_result[:100]}...")
             
             # 发送结果到钉钉
-            send_success = send_official_message(result, at_user_ids=at_user_ids)
+            send_success = send_official_message(final_result, at_user_ids=at_user_ids)
             if send_success:
                 print("【异步任务】消息发送成功")
             else:
