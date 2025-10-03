@@ -108,70 +108,70 @@ class DeepseekAgent:
 
     def extract_tool_call(self, llm_response):
     """从LLM响应中提取并验证工具调用指令"""
-    print(f"【工具提取调试】开始提取，原始响应: '{llm_response}'")
+        print(f"【工具提取调试】开始提取，原始响应: '{llm_response}'")
     
-    if not llm_response or not llm_response.strip():
-        print(f"【工具提取调试】响应为空，无法提取")
-        return None
+        if not llm_response or not llm_response.strip():
+            print(f"【工具提取调试】响应为空，无法提取")
+            return None
+            
+        tool_json = None
         
-    tool_json = None
-    
-    # 情况1：处理带```json包裹的JSON
-    if "```" in llm_response:
-        print(f"【工具提取调试】检测到```标记")
-        parts = [p.strip() for p in llm_response.split("```") if p.strip()]
-        print(f"【工具提取调试】分割部分: {parts}")
-        
-        for i, part in enumerate(parts):
-            print(f"【工具提取调试】检查部分{i}: '{part}'")
-            if part.lower().startswith("json"):
-                tool_json = part[4:].strip()
-                print(f"【工具提取调试】找到JSON部分: '{tool_json}'")
-                break
-            if part.startswith("{") and part.endswith("}"):
-                tool_json = part
+        # 情况1：处理带```json包裹的JSON
+        if "```" in llm_response:
+            print(f"【工具提取调试】检测到```标记")
+            parts = [p.strip() for p in llm_response.split("```") if p.strip()]
+            print(f"【工具提取调试】分割部分: {parts}")
+            
+            for i, part in enumerate(parts):
+                print(f"【工具提取调试】检查部分{i}: '{part}'")
+                if part.lower().startswith("json"):
+                    tool_json = part[4:].strip()
+                    print(f"【工具提取调试】找到JSON部分: '{tool_json}'")
+                    break
+                if part.startswith("{") and part.endswith("}"):
+                    tool_json = part
+                    print(f"【工具提取调试】找到纯JSON: '{tool_json}'")
+                    break
+        # 情况2：处理纯JSON
+        else:
+            print(f"【工具提取调试】无```标记，检查纯JSON")
+            clean_response = llm_response.strip()
+            if clean_response.startswith("{") and clean_response.endswith("}"):
+                tool_json = clean_response
                 print(f"【工具提取调试】找到纯JSON: '{tool_json}'")
-                break
-    # 情况2：处理纯JSON
-    else:
-        print(f"【工具提取调试】无```标记，检查纯JSON")
-        clean_response = llm_response.strip()
-        if clean_response.startswith("{") and clean_response.endswith("}"):
-            tool_json = clean_response
-            print(f"【工具提取调试】找到纯JSON: '{tool_json}'")
-
-    # 验证tool_json是否有效
-    if not tool_json:
-        print(f"【工具提取调试】未提取到工具调用JSON")
-        return None
-        
-    try:
-        print(f"【工具提取调试】尝试解析JSON: '{tool_json}'")
-        tool_data = json.loads(tool_json)
-        print(f"【工具提取调试】JSON解析成功: {tool_data}")
-        
-        # 验证必要字段
-        if not isinstance(tool_data, dict):
-            print(f"【工具提取调试】JSON不是字典类型")
+    
+        # 验证tool_json是否有效
+        if not tool_json:
+            print(f"【工具提取调试】未提取到工具调用JSON")
             return None
             
-        if "action" not in tool_data:
-            print(f"【工具提取调试】JSON缺少action字段")
-            return None
+        try:
+            print(f"【工具提取调试】尝试解析JSON: '{tool_json}'")
+            tool_data = json.loads(tool_json)
+            print(f"【工具提取调试】JSON解析成功: {tool_data}")
             
-        if "parameters" not in tool_data:
-            print(f"【工具提取调试】JSON缺少parameters字段")
-            return None
+            # 验证必要字段
+            if not isinstance(tool_data, dict):
+                print(f"【工具提取调试】JSON不是字典类型")
+                return None
+                
+            if "action" not in tool_data:
+                print(f"【工具提取调试】JSON缺少action字段")
+                return None
+                
+            if "parameters" not in tool_data:
+                print(f"【工具提取调试】JSON缺少parameters字段")
+                return None
+                
+            print(f"【工具提取调试】工具调用验证通过: {tool_data}")
+            return tool_data
             
-        print(f"【工具提取调试】工具调用验证通过: {tool_data}")
-        return tool_data
-        
-    except json.JSONDecodeError as e:
-        print(f"【工具提取调试】JSON解析错误: {str(e)}")
-        return None
-    except Exception as e:
-        print(f"【工具提取调试】其他错误: {str(e)}")
-        return None
+        except json.JSONDecodeError as e:
+            print(f"【工具提取调试】JSON解析错误: {str(e)}")
+            return None
+        except Exception as e:
+            print(f"【工具提取调试】其他错误: {str(e)}")
+            return None
 
     def process_input(self, user_input):
     """处理用户输入，调用Agent并返回结果"""
