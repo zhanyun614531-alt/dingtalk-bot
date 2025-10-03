@@ -63,50 +63,50 @@ class DeepseekAgent:
             return "计算失败"
 
     def send_qq_email(self, to, subject, body):
-    """发送邮件 - 使用 Resend HTTP API"""
-    if not all([to, subject, body]):
-        return "收件人、主题或正文不能为空"
-
-    resend_api_key = os.environ.get("RESEND_API_KEY")
-    if not resend_api_key:
-        return "邮件服务未配置完成，请联系管理员添加RESEND_API_KEY"
-
-    try:
-        # 使用Resend的测试域名或验证你自己的域名
-        from_email = "onboarding@resend.dev"  # Resend提供的测试发件人
-        
-        data = {
-            "from": from_email,
-            "to": [to],
-            "subject": subject,
-            "html": f"<div style='font-family: Arial, sans-serif; line-height: 1.6; white-space: pre-line;'>{body}</div>",
-            "text": body
-        }
-
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {resend_api_key}",
-                "Content-Type": "application/json"
-            },
-            json=data,
-            timeout=30
-        )
-
-        print(f"【Resend调试】状态码: {response.status_code}")
-        print(f"【Resend调试】响应: {response.text}")
-
-        if response.status_code == 200:
-            result = response.json()
-            return f"邮件发送成功！已发送至：{to}"
-        else:
-            error_detail = response.json().get('message', response.text)
-            return f"邮件发送失败：{error_detail}"
-
-    except Exception as e:
-        error_msg = f"邮件发送异常：{str(e)}"
-        print(f"【Resend错误】{error_msg}")
-        return error_msg
+        """发送邮件 - 使用 Resend HTTP API"""
+        if not all([to, subject, body]):
+            return "收件人、主题或正文不能为空"
+    
+        resend_api_key = os.environ.get("RESEND_API_KEY")
+        if not resend_api_key:
+            return "邮件服务未配置完成，请联系管理员添加RESEND_API_KEY"
+    
+        try:
+            # 使用Resend的测试域名或验证你自己的域名
+            from_email = "onboarding@resend.dev"  # Resend提供的测试发件人
+            
+            data = {
+                "from": from_email,
+                "to": [to],
+                "subject": subject,
+                "html": f"<div style='font-family: Arial, sans-serif; line-height: 1.6; white-space: pre-line;'>{body}</div>",
+                "text": body
+            }
+    
+            response = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {resend_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=data,
+                timeout=30
+            )
+    
+            print(f"【Resend调试】状态码: {response.status_code}")
+            print(f"【Resend调试】响应: {response.text}")
+    
+            if response.status_code == 200:
+                result = response.json()
+                return f"邮件发送成功！已发送至：{to}"
+            else:
+                error_detail = response.json().get('message', response.text)
+                return f"邮件发送失败：{error_detail}"
+    
+        except Exception as e:
+            error_msg = f"邮件发送异常：{str(e)}"
+            print(f"【Resend错误】{error_msg}")
+            return error_msg
 
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取工具调用指令"""
