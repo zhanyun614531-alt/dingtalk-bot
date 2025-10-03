@@ -36,51 +36,70 @@ ROBOT_SECRET = os.getenv('ROBOT_SECRET', '你的加签secret')  # 机器人安�
 processing_tasks = {}
 
 def async_process_llm_message(conversation_id, user_input, at_user_ids):
-    """异步处理LLM消息"""
+    """异步处理LLM消息 - 带完整调试"""
     try:
         print(f"【异步任务】开始处理: {user_input}")
+        print(f"【异步任务】会话ID: {conversation_id}")
+        print(f"【异步任务】@用户: {at_user_ids}")
         
+        # 测试环境变量在异步线程中是否可用
+        robot_token = os.environ.get('ROBOT_ACCESS_TOKEN')
+        robot_secret = os.environ.get('ROBOT_SECRET')
+        ark_key = os.environ.get('ARK_API_KEY')
+        
+        print(f"【环境变量检查】ROBOT_ACCESS_TOKEN: {'已设置' if robot_token else '未设置'}")
+        print(f"【环境变量检查】ROBOT_SECRET: {'已设置' if robot_secret else '未设置'}")
+        print(f"【环境变量检查】ARK_API_KEY: {'已设置' if ark_key else '未设置'}")
+        
+        if not ark_key:
+            error_msg = "Test1：ARK_API_KEY未设置，无法调用LLM"
+            print(f"【错误】{error_msg}")
+            send_official_message(error_msg, at_user_ids=at_user_ids)
+            return
+
         # 创建Agent并处理
+        print("【异步任务】创建Agent实例...")
         agent = Test.DeepseekAgent()
+        
+        print("【异步任务】开始LLM处理...")
+        start_time = time.time()
         response = agent.process_input(user_input)
+        processing_time = time.time() - start_time
         
-        print(f"【异步任务】处理完成: {response}")
+        print(f"【异步任务】LLM处理完成，耗时: {processing_time:.1f}秒")
+        print(f"【异步任务】LLM返回: {response}")
         
-        # 发送结果到钉钉
         if response:
             result = f"Test1：{response}"
-            send_official_message(result, at_user_ids=at_user_ids)
+            print(f"【异步任务】准备发送结果: {result[:100]}...")
             
-        # 从处理中任务移除
-        if conversation_id in processing_tasks:
-            del processing_tasks[conversation_id]
+            # 发送结果到钉钉
+            send_success = send_official_message(result, at_user_ids=at_user_ids)
+            if send_success:
+                print("【异步任务】消息发送成功")
+            else:
+                print("【异步任务】消息发送失败")
+        else:
+            error_msg = "Test1：LLM返回了空内容"
+            print(f"【异步任务】{error_msg}")
+            send_official_message(error_msg, at_user_ids=at_user_ids)
             
     except Exception as e:
         error_msg = f"Test1：异步处理出错: {str(e)}"
         print(f"【异步任务错误】{error_msg}")
-        send_official_message(error_msg, at_user_ids=at_user_ids)
-
-def verify_official_signature(timestamp, sign):
-    """
-    基于钉钉官方Demo的签名验证方法
-    与官方算法完全一致，解决签名验证失败问题
-    """
-    try:
-        # 按照官方文档拼接字符串
-        string_to_sign = f"{timestamp}\n{ROBOT_SECRET}"
-        # 计算HMAC-SHA256签名
-        hmac_code = hmac.new(
-            ROBOT_SECRET.encode('utf-8'),
-            string_to_sign.encode('utf-8'),
-            digestmod=hashlib.sha256
-        ).digest()
-        # 进行Base64编码并URL转义
-        computed_sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-        # 比对签名
-        return computed_sign == sign
-    except Exception as e:
-        logging.error(f"签名验证出错: {str(e)}")
-        return False
+        import traceback
+        print(f"【错误详情】{traceback.format_exc()}")
+        
+        # 尝试发送错误信息
+        try:
+            send_official_message(error_msg, at_user_ids=at_user_ids)
+        except:
+            print("【严重错误】连错误消息都无法发送")
+    finally:
+        # 从处理中任务移除
+        if conversation_id in processing_tasks:
+            del processing_tasks[conversation_id]
+        print(f"【异步任务】清理完成，会话ID: {conversation_id}")
 
 def remove_trailing_string(str, target):
     # 使用正则匹配末尾的目标字符串（包含可能的空格）
@@ -92,60 +111,32 @@ def remove_trailing_string(str, target):
 
 def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=False):
     """
-    基于官方Demo的消息发送方法
-    支持@用户功能，完全符合官方接口规范
+    基于官方Demo的消息发送方法，返回发送状态
     """
     try:
-        # def send_custom_robot_group_message(access_token, secret, msg, at_user_ids=None, at_mobiles=None,
-        #                                     is_at_all=False):
-        """
-        发送钉钉自定义机器人群消息
-        :param access_token: 机器人webhook的access_token
-        :param secret: 机器人安全设置的加签secret
-        :param msg: 消息内容
-        :param at_user_ids: @的用户ID列表
-        :param at_mobiles: @的手机号列表
-        :param is_at_all: 是否@所有人
-        :return: 钉钉API响应
-        """
-        # timestamp = str(round(time.time() * 1000))
-        # string_to_sign = f'{timestamp}\n{secret}'
-        # hmac_code = hmac.new(secret.encode('utf-8'), string_to_sign.encode('utf-8'),
-        #                      digestmod=hashlib.sha256).digest()
-        # sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-        #
-        # url = f'https://oapi.dingtalk.com/robot/send?access_token={access_token}&timestamp={timestamp}&sign={sign}'
-        #
-        # body = {
-        #     "at": {
-        #         "isAtAll": str(is_at_all).lower(),
-        #         "atUserIds": at_user_ids or [],
-        #         "atMobiles": at_mobiles or []
-        #     },
-        #     "text": {
-        #         "content": msg
-        #     },
-        #     "msgtype": "text"
-        # }
-        # headers = {'Content-Type': 'application/json'}
-        # resp = requests.post(url, json=body, headers=headers)
-        # logging.info("钉钉自定义机器人群消息响应：%s", resp.text)
-        # return resp.json()
-
         timestamp = str(round(time.time() * 1000))
-        # 计算签名（与官方Demo一致）
-        string_to_sign = f"{timestamp}\n{ROBOT_SECRET}"
+        
+        # 获取环境变量（确保在函数内部获取）
+        robot_token = os.environ.get('ROBOT_ACCESS_TOKEN')
+        robot_secret = os.environ.get('ROBOT_SECRET')
+        
+        if not robot_token or not robot_secret:
+            print("【发送错误】钉钉机器人配置缺失")
+            return False
+
+        # 计算签名
+        string_to_sign = f"{timestamp}\n{robot_secret}"
         hmac_code = hmac.new(
-            ROBOT_SECRET.encode('utf-8'),
+            robot_secret.encode('utf-8'),
             string_to_sign.encode('utf-8'),
             digestmod=hashlib.sha256
         ).digest()
         sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
 
-        # 构建官方要求的URL
-        url = f'https://oapi.dingtalk.com/robot/send?access_token={ROBOT_ACCESS_TOKEN}&timestamp={timestamp}&sign={sign}'
+        # 构建URL
+        url = f'https://oapi.dingtalk.com/robot/send?access_token={robot_token}&timestamp={timestamp}&sign={sign}'
 
-        # 构建消息体（支持@功能）
+        # 构建消息体
         body = {
             "at": {
                 "isAtAll": is_at_all,
@@ -159,18 +150,26 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
         }
 
         headers = {'Content-Type': 'application/json'}
-        resp = requests.post(url, json=body, headers=headers)
-        print(resp.text)
-
-        final_msg = re.sub(r'Test1$', '', resp.text)
-        # logging.info(f"钉钉消息发送响应: {resp.text}")
-        logging.info(f"钉钉消息发送响应: {final_msg}")
-
-        return resp.json()
+        print(f"【发送消息】准备发送到钉钉: {msg[:50]}...")
+        
+        resp = requests.post(url, json=body, headers=headers, timeout=10)
+        print(f"【发送消息】钉钉响应: {resp.status_code} - {resp.text}")
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            if result.get('errcode') == 0:
+                print("【发送消息】发送成功")
+                return True
+            else:
+                print(f"【发送消息】钉钉API错误: {result}")
+                return False
+        else:
+            print(f"【发送消息】HTTP错误: {resp.status_code}")
+            return False
+            
     except Exception as e:
-        error_msg = f"发送消息失败: {str(e)}"
-        logging.error(error_msg)
-        return {"error": error_msg}
+        print(f"【发送消息】异常: {str(e)}")
+        return False
 
 def process_command(command):
     """处理用户指令，支持多种功能"""
@@ -313,6 +312,26 @@ def get_server_ip():
     except Exception as e:
         return jsonify({"error": f"无法获取服务器IP: {str(e)}"})
 
+@app.route('/async-debug')
+def async_debug():
+    """异步任务调试信息"""
+    now = time.time()
+    active_tasks = {}
+    
+    for task_id, task_info in processing_tasks.items():
+        duration = now - task_info['start_time']
+        active_tasks[task_id] = {
+            "user_input": task_info['user_input'],
+            "duration_seconds": round(duration, 1),
+            "status": "running" if duration < 300 else "stuck"
+        }
+    
+    return jsonify({
+        "active_tasks_count": len(active_tasks),
+        "server_time": now,
+        "active_tasks": active_tasks
+    })
+    
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
     port = int(os.getenv('DINGTALK_PORT', 5000))
