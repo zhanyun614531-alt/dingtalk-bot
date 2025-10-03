@@ -331,7 +331,48 @@ def async_debug():
         "server_time": now,
         "active_tasks": active_tasks
     })
-    
+
+@app.route('/test-llm-direct')
+def test_llm_direct():
+    """直接测试LLM，绕过所有复杂逻辑"""
+    try:
+        import openai
+        
+        # 简单直接的测试
+        test_prompt = "2025年国庆假期法定节假日是什么时候？简要回答！"
+        print(f"【直接测试】开始测试，提示: {test_prompt}")
+        
+        response = openai.ChatCompletion.create(
+            model="bot-20250907084333-cbvff",
+            messages=[
+                {"role": "user", "content": test_prompt}
+            ],
+            stream=False
+        )
+        
+        print(f"【直接测试】响应: {response}")
+        
+        if hasattr(response, 'choices') and response.choices:
+            result = response.choices[0].message.content
+            return jsonify({
+                "status": "success",
+                "response": result,
+                "response_type": type(response).__name__,
+                "choices_count": len(response.choices)
+            })
+        else:
+            return jsonify({
+                "status": "error", 
+                "error": "No choices in response",
+                "response": str(response)
+            })
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        })
+
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
     port = int(os.getenv('DINGTALK_PORT', 5000))
