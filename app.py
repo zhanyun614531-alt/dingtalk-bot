@@ -7,6 +7,7 @@ import urllib.parse
 import json
 import requests
 import os
+import threading
 import time
 import datetime
 import logging
@@ -31,6 +32,33 @@ logging.basicConfig(
 ROBOT_ACCESS_TOKEN = os.getenv('ROBOT_ACCESS_TOKEN', '你的access_token')  # 机器人access_token
 ROBOT_SECRET = os.getenv('ROBOT_SECRET', '你的加签secret')  # 机器人安全设置中的加签secret
 
+# 存储处理中的任务
+processing_tasks = {}
+
+def async_process_llm_message(conversation_id, user_input, at_user_ids):
+    """异步处理LLM消息"""
+    try:
+        print(f"【异步任务】开始处理: {user_input}")
+        
+        # 创建Agent并处理
+        agent = Test.DeepseekAgent()
+        response = agent.process_input(user_input)
+        
+        print(f"【异步任务】处理完成: {response}")
+        
+        # 发送结果到钉钉
+        if response:
+            result = f"Test1：{response}"
+            send_official_message(result, at_user_ids=at_user_ids)
+            
+        # 从处理中任务移除
+        if conversation_id in processing_tasks:
+            del processing_tasks[conversation_id]
+            
+    except Exception as e:
+        error_msg = f"Test1：异步处理出错: {str(e)}"
+        print(f"【异步任务错误】{error_msg}")
+        send_official_message(error_msg, at_user_ids=at_user_ids)
 
 def verify_official_signature(timestamp, sign):
     """
@@ -190,49 +218,53 @@ def get_sender_ip():
 
 @app.route('/dingtalk/webhook', methods=['GET', 'POST'])
 def webhook():
-    """钉钉消息接收接口，使用官方签名验证逻辑"""
+    """钉钉消息接收接口，使用异步处理LLM请求"""
     # 处理GET请求（用于验证连接）
     if request.method == 'GET':
         return "钉钉机器人服务运行中 ✅", 200
 
     # 处理POST请求（钉钉消息）
     try:
-        # 获取官方要求的签名参数
-        # timestamp = request.headers.get('timestamp')
-        # print(timestamp)
-        # print("*"*50)
-
-        # sign = request.headers.get('sign')
-        # timestamp = str(round(time.time() * 1000))
-
-        # print(timestamp, sign)
-
-        # 验证签名（使用官方算法）
-        # if not verify_official_signature(timestamp, sign):
-        #     logging.warning("签名验证失败，可能是secret不匹配或参数错误")
-        #     return jsonify({"error": "签名验证失败"}), 403
-
-        # 解析消息内容
         data = request.json
         logging.info(f"收到钉钉消息: {json.dumps(data, ensure_ascii=False)}")
 
-        # 提取指令内容（兼容企业机器人和普通机器人格式）
+        # 提取消息内容
         if 'text' in data and 'content' in data['text']:
-            # 处理可能包含的@标识
             raw_content = data['text']['content'].strip()
-            # 移除@机器人的标签（如<at id="xxx">@机器人</at>）
             command = re.sub(r'<at id=".*?">@.*?</at>', '', raw_content).strip()
-
-            # 处理指令并发送回复
-            result = process_command(command)
-
-            # 提取需要@的用户（如果有）
+            
+            # 提取会话ID用于跟踪
+            conversation_id = data.get('conversationId', 'unknown')
             at_user_ids = [user['dingtalkId'] for user in data.get('atUsers', [])]
-            send_result = send_official_message(
-                result,
-                at_user_ids=at_user_ids,
-                is_at_all=False
-            )
+
+            # 处理非LLM指令（立即响应）
+            if not command.startswith("Test1 LLM"):
+                result = process_command(command)
+                send_official_message(result, at_user_ids=at_user_ids)
+                return jsonify({"success": True})
+
+            # 处理LLM指令（异步）
+            else:
+                # 立即响应"处理中"消息
+                immediate_response = "Test1：正在思考中，请稍等片刻... ⏳"
+                send_official_message(immediate_response, at_user_ids=at_user_ids)
+                
+                # 启动异步处理线程
+                pure_command = re.sub(r'^Test1\s*LLM\s*', '', command).strip()
+                thread = threading.Thread(
+                    target=async_process_llm_message,
+                    args=(conversation_id, pure_command, at_user_ids)
+                )
+                thread.daemon = True
+                thread.start()
+                
+                # 记录处理中的任务
+                processing_tasks[conversation_id] = {
+                    "start_time": time.time(),
+                    "user_input": pure_command
+                }
+                
+                return jsonify({"success": True, "status": "processing"})
 
         return jsonify({"success": True})
 
