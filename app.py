@@ -225,6 +225,18 @@ def webhook():
         logging.error(error_msg)
         return jsonify({"error": error_msg}), 500
 
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy", "service": "dingtalk-bot"})
+
+@app.route('/ip')
+def get_ip():
+    """获取Render服务器的公网IP"""
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    return jsonify({
+        "client_ip": client_ip,
+        "headers": dict(request.headers)
+    })
 
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
