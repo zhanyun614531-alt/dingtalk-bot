@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 import openai  # ✅ 改为旧版本导入
 from dotenv import load_dotenv
+import time
 
 # 加载环境变量（从.env文件读取API密钥等配置）
 load_dotenv()
