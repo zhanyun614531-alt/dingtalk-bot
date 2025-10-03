@@ -150,19 +150,35 @@ def process_command(command):
     key = "Test1"
     raw_command = re.sub(re.escape(key), '', original_msg)
     command = re.sub(r'\s', '', raw_command)
-    # print(command)
+    
+    print(f"【调试】原始命令: '{original_msg}'")
+    print(f"【调试】处理后命令: '{command}'")
+    
     if not command:
         return "Test1：请发送具体指令哦~ 支持的指令：\n- LLM"
     elif command == '时间':
         return f"Test1：当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-
     elif command.startswith("LLM"):
-        agent = Test.DeepseekAgent()
-        pure_command = re.sub(r'^Test1\s*LLM\s*', '', command)
-        response = agent.process_input(pure_command)
-        return f"Test1：{response}"
-
-    # 未知指令
+        try:
+            print(f"【调试】开始调用LLM，命令: '{command}'")
+            agent = Test.DeepseekAgent()
+            pure_command = re.sub(r'^LLM', '', command).strip()
+            print(f"【调试】LLM纯命令: '{pure_command}'")
+            
+            response = agent.process_input(pure_command)
+            print(f"【调试】LLM返回: '{response}'")
+            
+            if response is None:
+                return "Test1：LLM处理超时或无响应"
+            elif not response.strip():
+                return "Test1：LLM返回了空内容"
+            else:
+                return f"Test1：{response}"
+                
+        except Exception as e:
+            error_msg = f"Test1：LLM处理出错: {str(e)}"
+            print(f"【错误】{error_msg}")
+            return error_msg
     else:
         return f"Test1：暂不支持该指令：{command}\n发送「帮助」查看支持的功能"
 
