@@ -147,7 +147,7 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
 def process_command(command):
     """处理用户指令，支持多种功能"""
     original_msg = command.strip()
-    key = "回复"
+    key = "Test"
     raw_command = re.sub(re.escape(key), '', original_msg)
     command = re.sub(r'\s', '', raw_command)
     # print(command)
@@ -158,9 +158,9 @@ def process_command(command):
 
     elif command.startswith("LLM"):
         agent = Test.DeepseekAgent()
-        pure_command = re.sub(r'^回复\s*LLM\s*', '', command)
+        pure_command = re.sub(r'^Test\s*LLM\s*', '', command)
         response = agent.process_input(pure_command)
-        return f"回复：{response}"
+        return f"Test：{response}"
 
     # 未知指令
     else:
