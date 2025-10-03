@@ -11,7 +11,7 @@ import threading
 import time
 import logging
 import re
-import Test
+import agent_tools
 
 # 加载环境变量（从.env文件读取API密钥等配置）
 load_dotenv()
@@ -60,7 +60,7 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
         
         # 添加更详细的调试
         print("【异步任务】准备调用 Test.smart_assistant...")
-        result = Test.smart_assistant(user_input)
+        result = agent_tools.smart_assistant(user_input)
         
         processing_time = time.time() - start_time
         print(f"【异步任务】LLM处理完成，耗时: {processing_time:.1f}秒")
