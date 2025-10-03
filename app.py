@@ -374,6 +374,41 @@ def test_llm_direct():
             "error": str(e)
         })
 
+@app.route('/test-module')
+def test_module():
+    """直接测试Test.py模块"""
+    try:
+        print("【模块测试】开始测试Test.py模块...")
+        
+        # 测试1: 导入是否成功
+        print("【模块测试】检查导入...")
+        from Test import smart_assistant
+        print("【模块测试】导入成功")
+        
+        # 测试2: 简单调用
+        print("【模块测试】开始简单调用...")
+        test_input = "你好，请简单回复'测试成功'"
+        result = smart_assistant(test_input)
+        
+        print(f"【模块测试】调用结果: {result}")
+        
+        return jsonify({
+            "status": "success",
+            "module_test": "通过",
+            "result": result
+        })
+        
+    except Exception as e:
+        import traceback
+        full_traceback = traceback.format_exc()
+        print(f"【模块测试错误】\n{full_traceback}")
+        
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "traceback": full_traceback
+        })
+        
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
     port = int(os.getenv('DINGTALK_PORT', 5000))
