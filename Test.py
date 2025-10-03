@@ -111,34 +111,46 @@ class DeepseekAgent:
         # ... 保持原有的extract_tool_call方法
 
     def process_input(self, user_input):
-        """处理用户输入，调用Agent并渲染多色内容"""
+    """处理用户输入，调用Agent并返回结果"""
+    try:
+        print(f"【Test.py】开始处理: {user_input}")
+        
         self.memory.add_message("user", user_input)
         messages = self.memory.get_messages()
+        
+        print("【Test.py】调用火山方舟API...")
+        start_time = time.time()
+        
+        response = openai.ChatCompletion.create(
+            model=self.model_id,
+            messages=messages,
+            stream=False
+        )
+        
+        processing_time = time.time() - start_time
+        llm_raw_response = response.choices[0].message.content.strip()
+        
+        print(f"【Test.py】API调用成功，耗时: {processing_time:.1f}秒")
+        print(f"【Test.py】原始响应: {llm_raw_response[:200]}...")
+        
+        self.memory.add_message("assistant", llm_raw_response)
+        
+        # 提取工具调用
+        tool_data = self.extract_tool_call(llm_raw_response)
+        if tool_data:
+            print(f"【Test.py】检测到工具调用: {tool_data['action']}")
+            tool_result = self.toolkit.call_tool(tool_data["action"], tool_data["parameters"])
+            return tool_result
+        else:
+            print("【Test.py】直接返回文本响应")
+            return llm_raw_response
 
-        try:
-            print("思考中...\n", "thinking")
-            # ✅ 改为旧版本API调用
-            response = openai.ChatCompletion.create(
-                model=self.model_id,
-                messages=messages,
-                stream=False
-            )
-            llm_raw_response = response.choices[0].message.content.strip()
-            self.memory.add_message("assistant", llm_raw_response)
-            print(f"【调试】LLM原始响应：{llm_raw_response[:200]}...\n\n", "debug")
-            
-            tool_data = self.extract_tool_call(llm_raw_response)
-            if tool_data:
-                print(f"调用工具：{tool_data['action']}\n", "tool")
-                print(f"【调试】准备调用工具：{tool_data['action']}，参数：{tool_data['parameters']}")
-                tool_result = self.toolkit.call_tool(tool_data["action"], tool_data["parameters"])
-                print(f"工具返回结果：\n{tool_result}\n\n", "tool_result")
-                print(f"【调试】工具返回结果：{tool_result}")
-
-        except Exception as e:
-            error_msg = f"处理失败：{str(e)}\n"
-            print(error_msg, "error")
-            self.memory.add_message("system", error_msg)
+    except Exception as e:
+        error_msg = f"Test.py处理失败：{str(e)}"
+        print(f"【Test.py错误】{error_msg}")
+        import traceback
+        print(f"【Test.py错误详情】{traceback.format_exc()}")
+        return error_msg
 
 if __name__ == "__main__":
     agent = DeepseekAgent()
