@@ -97,14 +97,27 @@ class Toolkit:
 class DeepseekAgent:
     """Agent主类，协调LLM、记忆和工具调用"""
     def __init__(self):
-        self.client = OpenAI(
-            base_url="https://ark.cn-beijing.volces.com/api/v3/bots",
-            api_key=os.environ.get("ARK_API_KEY")
-        )
+        # 不要在这里初始化client，等到实际使用时再初始化
+        self.base_url = "https://ark.cn-beijing.volces.com/api/v3/bots"
+        self.api_key = os.environ.get("ARK_API_KEY")
         # self.model_id = "bot-20250906074401-gbz95"  # Deepseek R1 model ID
         self.model_id = "bot-20250907084333-cbvff"  # Deepseek V3 model ID
         self.memory = AgentMemory()
         self.toolkit = Toolkit()
+        self._client = None  # 延迟初始化
+
+    @property
+    def client(self):
+        """延迟初始化OpenAI客户端"""
+        if self._client is None:
+            if not self.api_key:
+                raise ValueError("ARK_API_KEY环境变量未设置")
+            
+            self._client = OpenAI(
+                base_url=self.base_url,
+                api_key=self.api_key
+            )
+        return self._client
 
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取并验证工具调用指令（支持纯JSON和```json包裹的JSON）"""
