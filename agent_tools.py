@@ -67,25 +67,31 @@ class DeepseekAgent:
         if not all([to, subject, body]):
             return "收件人、主题或正文不能为空"
 
-        qq_user = os.environ.get("QQ_EMAIL_USER", "").strip()
-        qq_auth_code = os.environ.get("QQ_EMAIL_AUTH_CODE", "").strip()
+        # qq_user = os.environ.get("QQ_EMAIL_USER", "").strip()
+        # qq_auth_code = os.environ.get("QQ_EMAIL_AUTH_CODE", "").strip()
 
-        if not all([qq_user, qq_auth_code]):
-            return "请配置QQ邮箱信息"
+        # if not all([qq_user, qq_auth_code]):
+        #     return "请配置QQ邮箱信息"
 
-        try:
-            message = MIMEText(body, 'plain', 'utf-8')
-            message['From'] = qq_user
-            message['To'] = to
-            message['Subject'] = Header(subject, 'utf-8')
+        # try:
+        #     message = MIMEText(body, 'plain', 'utf-8')
+        #     message['From'] = qq_user
+        #     message['To'] = to
+        #     message['Subject'] = Header(subject, 'utf-8')
 
-            server = smtplib.SMTP_SSL('smtp.qq.com', 465)
-            server.login(qq_user, qq_auth_code)
-            server.sendmail(qq_user, to, message.as_string())
-            server.quit()
-            return f"邮件发送成功！已发送至：{to}"
-        except Exception as e:
-            return f"邮件发送失败：{str(e)}"
+        #     server = smtplib.SMTP_SSL('smtp.qq.com', 465)
+        #     server.login(qq_user, qq_auth_code)
+        #     server.sendmail(qq_user, to, message.as_string())
+        #     server.quit()
+        #     return f"邮件发送成功！已发送至：{to}"
+        # except Exception as e:
+        #     return f"邮件发送失败：{str(e)}"
+
+        # 模拟发送成功，实际不发送
+        print(f"【模拟发送】到: {to}, 主题: {subject}, 内容长度: {len(body)}")
+    
+        # 在实际环境中返回模拟成功消息
+        return f"【测试模式】邮件已模拟发送至：{to}\n主题：{subject}\n内容：{body[:100]}..."
 
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取工具调用指令"""
