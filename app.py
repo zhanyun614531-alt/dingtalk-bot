@@ -409,100 +409,17 @@ def test_module():
             "traceback": full_traceback
         })
 
-@app.route('/test-all-ports')
-def test_all_ports():
-    """测试所有可能的SMTP端口"""
-    import socket
-    
-    ports_to_test = [587, 465, 25, 80, 443]
-    results = {}
-    
-    for port in ports_to_test:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5)
-            result = sock.connect_ex(('smtp.qq.com', port))
-            sock.close()
-            
-            results[f"port_{port}"] = {
-                "connectable": result == 0,
-                "error_code": result
-            }
-        except Exception as e:
-            results[f"port_{port}"] = {
-                "connectable": False,
-                "error": str(e)
-            }
-    
-    return jsonify({
-        "host": "smtp.qq.com",
-        "port_test_results": results,
-        "note": "如果所有端口都不可用，请使用Resend等HTTP邮件服务"
-    })
-@app.route('/test-smtp-ports')
-def test_smtp_ports():
-    """详细测试SMTP端口和服务"""
-    import smtplib
-    import socket
-    
-    qq_user = os.environ.get("QQ_EMAIL_USER", "").strip()
-    qq_auth_code = os.environ.get("QQ_EMAIL_AUTH_CODE", "").strip()
-    
-    ports_to_test = [
-        (443, "SSL"),
-        (80, "Plain/TLS"), 
-        (587, "TLS"),
-        (465, "SSL")
-    ]
-    
-    results = {}
-    
-    for port, encryption in ports_to_test:
-        try:
-            # 测试连接
-            start_time = time.time()
-            
-            if encryption == "SSL":
-                server = smtplib.SMTP_SSL('smtp.qq.com', port, timeout=10)
-            else:
-                server = smtplib.SMTP('smtp.qq.com', port, timeout=10)
-                
-            connect_time = time.time() - start_time
-            
-            # 测试登录
-            login_success = False
-            if qq_user and qq_auth_code:
-                try:
-                    if encryption == "TLS" or encryption == "Plain/TLS":
-                        server.starttls()
-                    server.login(qq_user, qq_auth_code)
-                    login_success = True
-                except Exception as login_error:
-                    login_success = f"登录失败: {str(login_error)}"
-            
-            server.quit()
-            
-            results[f"port_{port}"] = {
-                "connectable": True,
-                "encryption": encryption,
-                "connect_time": round(connect_time, 2),
-                "login_status": login_success
-            }
-            
-        except Exception as e:
-            results[f"port_{port}"] = {
-                "connectable": False,
-                "encryption": encryption,
-                "error": str(e)
-            }
-    
-    return jsonify({
-        "smtp_service_test": results,
-        "environment_check": {
-            "qq_user_set": bool(qq_user),
-            "qq_auth_code_set": bool(qq_auth_code)
-        }
-    })
+@app.route('/debug-env')
+def debug_env():
+    """调试环境变量"""
+    env_vars = {
+        'BREVO_API_KEY_SET': bool(os.environ.get('BREVO_API_KEY')),
+        'BREVO_API_KEY_LENGTH': len(os.environ.get('BREVO_API_KEY', '')),
+        'BREVO_SENDER_EMAIL': os.environ.get('BREVO_SENDER_EMAIL'),
+        'BREVO_SENDER_NAME': os.environ.get('BREVO_SENDER_NAME'),
+        'ARK_API_KEY_SET': bool(os.environ.get('ARK_API_KEY')),
+    }
+    return jsonify(env_vars)
 
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
