@@ -59,7 +59,7 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
         start_time = time.time()
         
         # 添加更详细的调试
-        print("【异步任务】准备调用 Test.smart_assistant...")
+        print("【异步任务】准备调用 agent_tools.smart_assistant...")
         result = agent_tools.smart_assistant(user_input)
         
         processing_time = time.time() - start_time
@@ -194,7 +194,7 @@ def process_command(command):
             print(f"【调试】开始调用LLM，命令: '{command}'")
             pure_command = re.sub(r'^LLM', '', command).strip()
             print(f"【调试】LLM纯命令: '{pure_command}'")
-            response = Test.smart_assistant(pure_command)
+            response = agent_tools.smart_assistant(pure_command)
             print(f"【调试】LLM返回: '{response}'")
             
             if response is None:
@@ -333,93 +333,6 @@ def async_debug():
         "server_time": now,
         "active_tasks": active_tasks
     })
-
-@app.route('/test-llm-direct')
-def test_llm_direct():
-    """直接测试LLM，绕过所有复杂逻辑"""
-    try:
-        from openai import OpenAI  # ✅ 新版本导入
-        
-        # 创建客户端
-        client = OpenAI(
-            base_url="https://ark.cn-beijing.volces.com/api/v3/bots",
-            api_key=os.environ.get("ARK_API_KEY")
-        )
-        
-        # 简单直接的测试
-        test_prompt = "2025年国庆假期法定节假日是什么时候？简要回答！"
-        print(f"【直接测试】开始测试，提示: {test_prompt}")
-        
-        response = client.chat.completions.create(
-            model="bot-20250907084333-cbvff",
-            messages=[
-                {"role": "user", "content": test_prompt}
-            ],
-            stream=False
-        )
-        
-        print(f"【直接测试】响应: {response}")
-        
-        result = response.choices[0].message.content
-        return jsonify({
-            "status": "success",
-            "response": result,
-            "response_type": type(response).__name__,
-            "choices_count": len(response.choices)
-        })
-            
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        })
-
-@app.route('/test-module')
-def test_module():
-    """直接测试Test.py模块"""
-    try:
-        print("【模块测试】开始测试Test.py模块...")
-        
-        # 测试1: 导入是否成功
-        print("【模块测试】检查导入...")
-        from Test import smart_assistant
-        print("【模块测试】导入成功")
-        
-        # 测试2: 简单调用
-        print("【模块测试】开始简单调用...")
-        test_input = "你好，请简单回复'测试成功'"
-        result = smart_assistant(test_input)
-        
-        print(f"【模块测试】调用结果: {result}")
-        
-        return jsonify({
-            "status": "success",
-            "module_test": "通过",
-            "result": result
-        })
-        
-    except Exception as e:
-        import traceback
-        full_traceback = traceback.format_exc()
-        print(f"【模块测试错误】\n{full_traceback}")
-        
-        return jsonify({
-            "status": "error",
-            "error": str(e),
-            "traceback": full_traceback
-        })
-
-@app.route('/debug-env')
-def debug_env():
-    """调试环境变量"""
-    env_vars = {
-        'BREVO_API_KEY_SET': bool(os.environ.get('BREVO_API_KEY')),
-        'BREVO_API_KEY_LENGTH': len(os.environ.get('BREVO_API_KEY', '')),
-        'BREVO_SENDER_EMAIL': os.environ.get('BREVO_SENDER_EMAIL'),
-        'BREVO_SENDER_NAME': os.environ.get('BREVO_SENDER_NAME'),
-        'ARK_API_KEY_SET': bool(os.environ.get('ARK_API_KEY')),
-    }
-    return jsonify(env_vars)
 
 if __name__ == '__main__':
     # 从环境变量获取端口，默认5000
