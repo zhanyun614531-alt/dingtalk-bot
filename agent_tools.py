@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv()
 
+
 class DeepseekAgent:
     """智能助手Agent"""
 
@@ -60,86 +61,87 @@ class DeepseekAgent:
             return "计算失败"
 
     def send_email(self, to, subject, body):
-    """发送邮件 - 使用 Brevo API（带详细调试）"""
-    if not all([to, subject, body]):
-        return "收件人、主题或正文不能为空"
+        """发送邮件 - 使用 Brevo API（带详细调试）"""
 
-    brevo_api_key = os.environ.get("BREVO_API_KEY")
-    sender_email = os.environ.get("BREVO_SENDER_EMAIL", "noreply@brevo.com")
-    sender_name = os.environ.get("BREVO_SENDER_NAME", "智能助手")
-
-    print(f"【Brevo调试】环境变量检查:")
-    print(f"  - BREVO_API_KEY 存在: {bool(brevo_api_key)}")
-    print(f"  - BREVO_API_KEY 长度: {len(brevo_api_key) if brevo_api_key else 0}")
-    print(f"  - BREVO_SENDER_EMAIL: {sender_email}")
-    print(f"  - BREVO_SENDER_NAME: {sender_name}")
-
-    if not brevo_api_key:
-        return "❌ 邮件服务未配置：BREVO_API_KEY 未找到"
-
-    # 检查API Key格式
-    if not brevo_api_key.startswith('xkeysib-'):
-        print(f"【Brevo警告】API Key 格式可能不正确，应以 'xkeysib-' 开头")
-
-    try:
-        # Brevo API v3
-        url = "https://api.brevo.com/v3/smtp/email"
-        
-        payload = {
-            "sender": {
-                "name": sender_name,
-                "email": sender_email
-            },
-            "to": [
-                {
-                    "email": to,
-                    "name": to.split('@')[0]
-                }
-            ],
-            "subject": subject,
-            "htmlContent": f"""
-            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                <h2>{subject}</h2>
-                <div style="white-space: pre-line;">{body}</div>
-            </div>
-            """,
-            "textContent": body
-        }
-
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "api-key": brevo_api_key
-        }
-
-        print(f"【Brevo调试】请求头: {headers}")
-        print(f"【Brevo调试】请求负载: {payload}")
-
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
-        print(f"【Brevo调试】响应状态码: {response.status_code}")
-        print(f"【Brevo调试】完整响应: {response.text}")
-
-        if response.status_code == 201:
-            result = response.json()
-            message_id = result.get('messageId', '')
-            return f"📧 邮件发送成功！已发送至：{to}"
-        else:
-            # 更详细的错误处理
-            try:
-                error_data = response.json()
-                error_message = error_data.get('message', 'Unknown error')
-                error_code = error_data.get('code', 'No error code')
-                return f"❌ 邮件发送失败 [{response.status_code}]: {error_message} (代码: {error_code})"
-            except:
-                return f"❌ 邮件发送失败 [{response.status_code}]: {response.text}"
-
-    except Exception as e:
-        error_msg = f"❌ 邮件发送异常：{str(e)}"
-        print(f"【Brevo错误】{error_msg}")
-        import traceback
-        print(f"【Brevo错误堆栈】{traceback.format_exc()}")
-        return error_msg
+        if not all([to, subject, body]):
+            return "收件人、主题或正文不能为空"
+    
+        brevo_api_key = os.environ.get("BREVO_API_KEY")
+        sender_email = os.environ.get("BREVO_SENDER_EMAIL", "noreply@brevo.com")
+        sender_name = os.environ.get("BREVO_SENDER_NAME", "智能助手")
+    
+        print(f"【Brevo调试】环境变量检查:")
+        print(f"  - BREVO_API_KEY 存在: {bool(brevo_api_key)}")
+        print(f"  - BREVO_API_KEY 长度: {len(brevo_api_key) if brevo_api_key else 0}")
+        print(f"  - BREVO_SENDER_EMAIL: {sender_email}")
+        print(f"  - BREVO_SENDER_NAME: {sender_name}")
+    
+        if not brevo_api_key:
+            return "❌ 邮件服务未配置：BREVO_API_KEY 未找到"
+    
+        # 检查API Key格式
+        if not brevo_api_key.startswith('xkeysib-'):
+            print(f"【Brevo警告】API Key 格式可能不正确，应以 'xkeysib-' 开头")
+    
+        try:
+            # Brevo API v3
+            url = "https://api.brevo.com/v3/smtp/email"
+    
+            payload = {
+                "sender": {
+                    "name": sender_name,
+                    "email": sender_email
+                },
+                "to": [
+                    {
+                        "email": to,
+                        "name": to.split('@')[0]
+                    }
+                ],
+                "subject": subject,
+                "htmlContent": f"""
+                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                    <h2>{subject}</h2>
+                    <div style="white-space: pre-line;">{body}</div>
+                </div>
+                """,
+                "textContent": body
+            }
+    
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+                "api-key": brevo_api_key
+            }
+    
+            print(f"【Brevo调试】请求头: {headers}")
+            print(f"【Brevo调试】请求负载: {payload}")
+    
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+    
+            print(f"【Brevo调试】响应状态码: {response.status_code}")
+            print(f"【Brevo调试】完整响应: {response.text}")
+    
+            if response.status_code == 201:
+                result = response.json()
+                message_id = result.get('messageId', '')
+                return f"📧 邮件发送成功！已发送至：{to}"
+            else:
+                # 更详细的错误处理
+                try:
+                    error_data = response.json()
+                    error_message = error_data.get('message', 'Unknown error')
+                    error_code = error_data.get('code', 'No error code')
+                    return f"❌ 邮件发送失败 [{response.status_code}]: {error_message} (代码: {error_code})"
+                except:
+                    return f"❌ 邮件发送失败 [{response.status_code}]: {response.text}"
+    
+        except Exception as e:
+            error_msg = f"❌ 邮件发送异常：{str(e)}"
+            print(f"【Brevo错误】{error_msg}")
+            import traceback
+            print(f"【Brevo错误堆栈】{traceback.format_exc()}")
+            return error_msg
 
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取工具调用指令"""
@@ -199,11 +201,13 @@ class DeepseekAgent:
         except Exception as e:
             return f"处理请求时出错：{str(e)}", False
 
+
 def smart_assistant(user_input):
     """智能助手主函数"""
     agent = DeepseekAgent()
     result, tool_used = agent.process_request(user_input)
     return result
+
 
 if __name__ == "__main__":
     # 测试示例
@@ -212,7 +216,7 @@ if __name__ == "__main__":
         "计算123 + 456",
         "向379609511@qq.com发送测试邮件，主题为'Brevo测试'，内容为'这是一封通过Brevo发送的测试邮件'"
     ]
-    
+
     for request in test_requests:
         print(f"请求: {request}")
         result = smart_assistant(request)
