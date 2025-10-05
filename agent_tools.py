@@ -9,6 +9,7 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.oauth2.credentials import Credentials
 
 # 加载环境变量
 load_dotenv()
@@ -19,28 +20,57 @@ class GoogleCalendarManager:
 
     def __init__(self):
         self.SCOPES = ['https://www.googleapis.com/auth/calendar']
+        # 从环境变量构建credentials字典
+        self.credentials_info = self._get_credentials_from_env()
         self.service = self._authenticate()
 
-    def _authenticate(self):
-        """Google日历认证"""
-        creds = None
-        # token.pickle存储用户的访问和刷新令牌
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                creds = pickle.load(token)
+    def _get_credentials_from_env(self):
+        """从环境变量构建credentials字典"""
+        # 注意：这里从环境变量读取，而不是本地文件
+        credentials_info = {
+            "installed": {
+                "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+                "project_id": os.environ.get("GOOGLE_PROJECT_ID", ""),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+                "redirect_uris": [os.environ.get("GOOGLE_REDIRECT_URIS", "http://localhost")]
+            }
+        }
+        return credentials_info
 
-        # 如果没有有效的凭据，让用户登录
+    def _authenticate(self):
+        """Google日历认证 - 适配Render环境"""
+        creds = None
+
+        # 在Render上，我们无法永久保存token.pickle，因此主要依赖环境变量中的令牌
+        # 检查环境变量中是否已有令牌（适用于长期运行的服务）
+        token_json = os.environ.get('GOOGLE_TOKEN_JSON')
+        if token_json:
+            try:
+                token_info = json.loads(token_json)
+                creds = Credentials.from_authorized_user_info(token_info, self.SCOPES)
+            except Exception as e:
+                print(f"从环境变量加载令牌失败: {e}")
+
+        # 如果令牌不存在或已过期，则需要进行OAuth流程
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                    # 如果需要，可以在这里更新环境中的令牌（如果您的部署支持）
+                except Exception as e:
+                    print(f"刷新令牌失败: {e}")
+                    creds = None
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', self.SCOPES)
-                creds = flow.run_local_server(port=0)
-
-            # 保存凭据以供下次运行使用
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(creds, token)
+                # 在Render上，我们需要一个方法来处理首次授权
+                # 由于Render是无状态的，这可能需要在本地完成一次，然后捕获令牌并设置为环境变量
+                print("⚠️  需要在本地完成首次OAuth授权。")
+                print("1. 在本地运行应用完成授权")
+                print("2. 授权后，将生成的token.pickle内容（JSON格式）设置为Render的GOOGLE_TOKEN_JSON环境变量")
+                # 对于生产环境，可以考虑更成熟的令牌管理方案
+                return None
 
         return build('calendar', 'v3', credentials=creds)
 
