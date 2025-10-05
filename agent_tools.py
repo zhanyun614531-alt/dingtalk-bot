@@ -16,7 +16,7 @@ load_dotenv()
 
 
 class GoogleCalendarManager:
-    """Google日历管理器"""
+    """Google日历管理器 - 适配Render部署"""
 
     def __init__(self):
         self.SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -26,7 +26,6 @@ class GoogleCalendarManager:
 
     def _get_credentials_from_env(self):
         """从环境变量构建credentials字典"""
-        # 注意：这里从环境变量读取，而不是本地文件
         credentials_info = {
             "installed": {
                 "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
@@ -44,32 +43,49 @@ class GoogleCalendarManager:
         """Google日历认证 - 适配Render环境"""
         creds = None
 
-        # 在Render上，我们无法永久保存token.pickle，因此主要依赖环境变量中的令牌
-        # 检查环境变量中是否已有令牌（适用于长期运行的服务）
+        # 方案1: 从环境变量加载令牌（生产环境推荐）
         token_json = os.environ.get('GOOGLE_TOKEN_JSON')
         if token_json:
             try:
                 token_info = json.loads(token_json)
                 creds = Credentials.from_authorized_user_info(token_info, self.SCOPES)
+                print("✅ 从环境变量加载令牌成功")
             except Exception as e:
-                print(f"从环境变量加载令牌失败: {e}")
+                print(f"❌ 从环境变量加载令牌失败: {e}")
 
-        # 如果令牌不存在或已过期，则需要进行OAuth流程
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    # 如果需要，可以在这里更新环境中的令牌（如果您的部署支持）
-                except Exception as e:
-                    print(f"刷新令牌失败: {e}")
-                    creds = None
-            else:
-                # 在Render上，我们需要一个方法来处理首次授权
-                # 由于Render是无状态的，这可能需要在本地完成一次，然后捕获令牌并设置为环境变量
-                print("⚠️  需要在本地完成首次OAuth授权。")
-                print("1. 在本地运行应用完成授权")
-                print("2. 授权后，将生成的token.pickle内容（JSON格式）设置为Render的GOOGLE_TOKEN_JSON环境变量")
-                # 对于生产环境，可以考虑更成熟的令牌管理方案
+        # 方案2: 从本地token.pickle文件加载（开发环境）
+        if not creds and os.path.exists('token.pickle'):
+            try:
+                with open('token.pickle', 'rb') as token:
+                    creds = pickle.load(token)
+                print("✅ 从本地token.pickle加载令牌成功")
+            except Exception as e:
+                print(f"❌ 从token.pickle加载令牌失败: {e}")
+
+        # 检查令牌有效性
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                print("✅ 令牌刷新成功")
+            except Exception as e:
+                print(f"❌ 令牌刷新失败: {e}")
+                creds = None
+
+        # 如果没有有效令牌，启动OAuth流程
+        if not creds:
+            print("🚀 启动OAuth授权流程...")
+            try:
+                flow = InstalledAppFlow.from_client_config(
+                    self.credentials_info, self.SCOPES)
+                creds = flow.run_local_server(port=0)
+
+                # 保存令牌供后续使用
+                with open('token.pickle', 'wb') as token:
+                    pickle.dump(creds, token)
+                print("✅ OAuth授权成功，令牌已保存")
+
+            except Exception as e:
+                print(f"❌ OAuth授权失败: {e}")
                 return None
 
         return build('calendar', 'v3', credentials=creds)
