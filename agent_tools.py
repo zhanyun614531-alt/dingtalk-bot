@@ -398,6 +398,96 @@ class GoogleCalendarManager:
                 "error": f"❌ 删除任务时出错: {str(e)}"
             }
 
+    def delete_tasks_by_time_range(self, start_date=None, end_date=None, show_completed=True):
+        """
+        根据时间范围批量删除任务
+
+        Args:
+            start_date: 开始日期 (datetime对象或字符串 "YYYY-MM-DD")
+            end_date: 结束日期 (datetime对象或字符串 "YYYY-MM-DD")
+            show_completed: 是否包含已完成的任务
+        """
+        if not self.tasks_service:
+            return {
+                "success": False,
+                "error": "❌ 任务服务未初始化"
+            }
+
+        try:
+            # 解析日期参数
+            if isinstance(start_date, str):
+                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            if isinstance(end_date, str):
+                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+            # 如果没有指定结束日期，默认为开始日期后30天
+            if start_date and not end_date:
+                end_date = start_date + timedelta(days=30)
+
+            # 如果没有指定开始日期，默认为今天
+            if not start_date:
+                start_date = datetime.now(self.beijing_tz)
+
+            # 如果没有指定结束日期，默认为开始日期后30天
+            if not end_date:
+                end_date = start_date + timedelta(days=30)
+
+            # 确保使用北京时区
+            if start_date.tzinfo is None:
+                start_date = self.beijing_tz.localize(start_date)
+            if end_date.tzinfo is None:
+                end_date = self.beijing_tz.localize(end_date)
+
+            # 获取所有任务
+            result = self.query_tasks(show_completed=show_completed, max_results=500)
+            if not result["success"]:
+                return result
+
+            matching_tasks = []
+            for task in result["tasks"]:
+                # 检查任务是否有截止日期
+                if task['due'] != "无截止日期":
+                    try:
+                        # 解析任务的截止日期
+                        task_due = datetime.strptime(task['due'], '%Y-%m-%d %H:%M')
+                        task_due = self.beijing_tz.localize(task_due)
+
+                        # 检查任务是否在时间范围内
+                        if start_date <= task_due <= end_date:
+                            matching_tasks.append(task)
+                    except ValueError:
+                        # 如果日期解析失败，跳过这个任务
+                        continue
+
+            if not matching_tasks:
+                start_str = start_date.strftime('%Y-%m-%d')
+                end_str = end_date.strftime('%Y-%m-%d')
+                return {
+                    "success": False,
+                    "error": f"❌ 在 {start_str} 到 {end_str} 范围内没有找到任务"
+                }
+
+            # 删除匹配的任务
+            deleted_count = 0
+            for task in matching_tasks:
+                delete_result = self.delete_task(task['id'])
+                if delete_result["success"]:
+                    deleted_count += 1
+
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+            return {
+                "success": True,
+                "message": f"🗑️ 成功删除 {deleted_count} 个在 {start_str} 到 {end_str} 范围内的任务",
+                "deleted_count": deleted_count
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"❌ 按时间范围删除任务时出错: {str(e)}"
+            }
+
     # ========== 日历事件功能 ==========
 
     def create_event(self, summary, description="", start_time=None, end_time=None,
@@ -647,6 +737,96 @@ class GoogleCalendarManager:
                 "error": f"❌ 删除事件时出错: {str(e)}"
             }
 
+    def delete_events_by_time_range(self, start_date=None, end_date=None):
+        """
+        根据时间范围批量删除日历事件
+
+        Args:
+            start_date: 开始日期 (datetime对象或字符串 "YYYY-MM-DD")
+            end_date: 结束日期 (datetime对象或字符串 "YYYY-MM-DD")
+        """
+        if not self.service:
+            return {
+                "success": False,
+                "error": "❌ 日历服务未初始化"
+            }
+
+        try:
+            # 解析日期参数
+            if isinstance(start_date, str):
+                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            if isinstance(end_date, str):
+                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+            # 如果没有指定结束日期，默认为开始日期后30天
+            if start_date and not end_date:
+                end_date = start_date + timedelta(days=30)
+
+            # 如果没有指定开始日期，默认为今天
+            if not start_date:
+                start_date = datetime.now(self.beijing_tz)
+
+            # 如果没有指定结束日期，默认为开始日期后30天
+            if not end_date:
+                end_date = start_date + timedelta(days=30)
+
+            # 确保使用北京时区
+            if start_date.tzinfo is None:
+                start_date = self.beijing_tz.localize(start_date)
+            if end_date.tzinfo is None:
+                end_date = self.beijing_tz.localize(end_date)
+
+            # 转换为RFC3339格式
+            start_rfc3339 = start_date.isoformat()
+            end_rfc3339 = end_date.isoformat()
+
+            # 查询时间范围内的事件
+            events_result = self.service.events().list(
+                calendarId='primary',
+                timeMin=start_rfc3339,
+                timeMax=end_rfc3339,
+                maxResults=500,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+
+            events = events_result.get('items', [])
+
+            if not events:
+                start_str = start_date.strftime('%Y-%m-%d')
+                end_str = end_date.strftime('%Y-%m-%d')
+                return {
+                    "success": False,
+                    "error": f"❌ 在 {start_str} 到 {end_str} 范围内没有找到日历事件"
+                }
+
+            # 删除匹配的事件
+            deleted_count = 0
+            for event in events:
+                try:
+                    self.service.events().delete(
+                        calendarId='primary',
+                        eventId=event['id']
+                    ).execute()
+                    deleted_count += 1
+                except HttpError as error:
+                    print(f"❌ 删除事件 {event['id']} 失败: {error}")
+                    continue
+
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+            return {
+                "success": True,
+                "message": f"🗑️ 成功删除 {deleted_count} 个在 {start_str} 到 {end_str} 范围内的日历事件",
+                "deleted_count": deleted_count
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"❌ 按时间范围删除日历事件时出错: {str(e)}"
+            }
+
 
 class DeepseekAgent:
     """智能助手Agent - 修复工具调用问题"""
@@ -661,7 +841,7 @@ class DeepseekAgent:
         # 初始化Google日历管理器
         self.calendar_manager = GoogleCalendarManager()
 
-        # 更新系统提示词
+        # 更新系统提示词 - 添加时间范围删除功能
         self.system_prompt = """你是一个智能助手，具备工具调用能力。当用户请求涉及日历、任务、天气、计算或邮件时，你需要返回JSON格式的工具调用。
 
 可用工具：
@@ -671,27 +851,37 @@ class DeepseekAgent:
 3. 更新事件状态：{"action": "update_event_status", "parameters": {"event_id": "事件ID", "status": "completed"}}
 4. 删除日历事件：{"action": "delete_event", "parameters": {"event_id": "事件ID"}}
 5. 按标题删除事件：{"action": "delete_event_by_summary", "parameters": {"summary": "事件标题关键词", "days": 30}}
+6. 按时间范围删除事件：{"action": "delete_events_by_time_range", "parameters": {"start_date": "开始日期(YYYY-MM-DD)", "end_date": "结束日期(YYYY-MM-DD)"}}
 
 【任务管理功能】
-6. 创建任务：{"action": "create_task", "parameters": {"title": "任务标题", "notes": "任务描述", "due_date": "截止时间(YYYY-MM-DD HH:MM)", "reminder_minutes": 60, "priority": "medium"}}
-7. 查询任务：{"action": "query_tasks", "parameters": {"show_completed": false, "max_results": 20}}
-8. 更新任务状态：{"action": "update_task_status", "parameters": {"task_id": "任务ID", "status": "completed"}}
-9. 删除任务：{"action": "delete_task", "parameters": {"task_id": "任务ID"}}
-10. 按标题删除任务：{"action": "delete_task_by_title", "parameters": {"title_keyword": "任务标题关键词"}}
+7. 创建任务：{"action": "create_task", "parameters": {"title": "任务标题", "notes": "任务描述", "due_date": "截止时间(YYYY-MM-DD HH:MM)", "reminder_minutes": 60, "priority": "medium"}}
+8. 查询任务：{"action": "query_tasks", "parameters": {"show_completed": false, "max_results": 20}}
+9. 更新任务状态：{"action": "update_task_status", "parameters": {"task_id": "任务ID", "status": "completed"}}
+10. 删除任务：{"action": "delete_task", "parameters": {"task_id": "任务ID"}}
+11. 按标题删除任务：{"action": "delete_task_by_title", "parameters": {"title_keyword": "任务标题关键词"}}
+12. 按时间范围删除任务：{"action": "delete_tasks_by_time_range", "parameters": {"start_date": "开始日期(YYYY-MM-DD)", "end_date": "结束日期(YYYY-MM-DD)", "show_completed": true}}
 
 【其他功能】
-11. 天气查询：{"action": "get_weather", "parameters": {"city": "城市名称"}}
-12. 计算器：{"action": "calculator", "parameters": {"expression": "数学表达式"}}
-13. 发送邮件：{"action": "send_email", "parameters": {"to": "收件邮箱", "subject": "邮件主题", "body": "邮件内容"}}
+13. 天气查询：{"action": "get_weather", "parameters": {"city": "城市名称"}}
+14. 计算器：{"action": "calculator", "parameters": {"expression": "数学表达式"}}
+15. 发送邮件：{"action": "send_email", "parameters": {"to": "收件邮箱", "subject": "邮件主题", "body": "邮件内容"}}
 
 重要规则：
 1. 当需要调用工具时，必须返回 ```json 和 ``` 包裹的JSON格式
 2. 不需要工具时，直接用自然语言回答
 3. JSON格式必须严格符合上面的示例
-4. 时间格式：YYYY-MM-DD HH:MM (24小时制)
+4. 时间格式：YYYY-MM-DD HH:MM (24小时制)，日期格式：YYYY-MM-DD
 5. 优先级：low(低), medium(中), high(高)
 
 示例：
+用户：删除10月份的所有任务
+AI：```json
+{"action": "delete_tasks_by_time_range", "parameters": {"start_date": "2025-10-01", "end_date": "2025-10-31"}}
+```
+用户：清理下周的所有日历事件
+AI：```json
+{"action": "delete_events_by_time_range", "parameters": {"start_date": "2025-10-06", "end_date": "2025-10-12"}}
+```
 用户：创建任务：周五前完成报告
 AI：```json
 {"action": "create_task", "parameters": {"title": "完成报告", "notes": "周五前完成报告", "due_date": "2025-10-11 18:00", "reminder_minutes": 60, "priority": "medium"}}
@@ -888,6 +1078,30 @@ AI：```json
         except Exception as e:
             return f"❌ 按标题删除任务时出错: {str(e)}"
 
+    def delete_tasks_by_time_range(self, start_date=None, end_date=None, show_completed=True):
+        """按时间范围批量删除任务"""
+        try:
+            print(f"🗑️ 按时间范围删除任务: {start_date} 到 {end_date}")
+
+            result = self.calendar_manager.delete_tasks_by_time_range(
+                start_date=start_date,
+                end_date=end_date,
+                show_completed=show_completed
+            )
+
+            if result.get("success"):
+                print(f"✅ 时间范围删除任务成功")
+                return result.get("message", "✅ 时间范围删除任务完成")
+            else:
+                error_msg = result.get("error", "时间范围删除任务失败")
+                print(f"❌ 时间范围删除任务失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 按时间范围删除任务时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
     def create_event(self, summary, description="", start_time=None, end_time=None,
                      reminder_minutes=30, priority="medium"):
         """创建Google日历事件"""
@@ -965,6 +1179,29 @@ AI：```json
         except Exception as e:
             return f"❌ 按标题删除事件时出错: {str(e)}"
 
+    def delete_events_by_time_range(self, start_date=None, end_date=None):
+        """按时间范围批量删除日历事件"""
+        try:
+            print(f"🗑️ 按时间范围删除日历事件: {start_date} 到 {end_date}")
+
+            result = self.calendar_manager.delete_events_by_time_range(
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if result.get("success"):
+                print(f"✅ 时间范围删除日历事件成功")
+                return result.get("message", "✅ 时间范围删除日历事件完成")
+            else:
+                error_msg = result.get("error", "时间范围删除日历事件失败")
+                print(f"❌ 时间范围删除日历事件失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 按时间范围删除日历事件时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
     def extract_tool_call(self, llm_response):
         """从LLM响应中提取工具调用指令"""
         print(f"🔍 解析LLM响应: {llm_response}")
@@ -1022,6 +1259,12 @@ AI：```json
                 return self.delete_task_by_title(
                     title_keyword=parameters.get("title_keyword", "")
                 )
+            elif action == "delete_tasks_by_time_range":
+                return self.delete_tasks_by_time_range(
+                    start_date=parameters.get("start_date"),
+                    end_date=parameters.get("end_date"),
+                    show_completed=parameters.get("show_completed", True)
+                )
             elif action == "create_event":
                 return self.create_event(
                     summary=parameters.get("summary", ""),
@@ -1049,6 +1292,11 @@ AI：```json
                 return self.delete_event_by_summary(
                     summary=parameters.get("summary", ""),
                     days=parameters.get("days", 30)
+                )
+            elif action == "delete_events_by_time_range":
+                return self.delete_events_by_time_range(
+                    start_date=parameters.get("start_date"),
+                    end_date=parameters.get("end_date")
                 )
             elif action == "get_weather":
                 return self.get_weather(parameters.get("city", ""))
@@ -1118,10 +1366,15 @@ def test_all_features():
     # 日历事件测试
     "创建日历事件：明天下午2点团队会议，讨论项目进度，提前15分钟提醒我",
     "查看我未来一周的日程安排",
+
     # 任务管理测试
     "创建任务：周五前完成产品设计文档，这是一个高优先级的任务",
     "创建任务：下周一提交月度报告，提前一天提醒我",
     "查看我所有的待办任务",
+
+    # 时间范围删除测试
+    "删除10月份的所有任务",
+    "清理下周的所有日历事件",
     ]
 
     print("🧪 测试所有Google日历和任务功能")
