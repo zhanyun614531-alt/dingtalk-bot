@@ -10,6 +10,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2.credentials import Credentials
+from datetime import datetime, timedelta, timezone
+import pytz
 
 # 加载环境变量
 load_dotenv()
@@ -20,7 +22,7 @@ class GoogleCalendarManager:
 
     def __init__(self):
         self.SCOPES = ['https://www.googleapis.com/auth/calendar']
-        # 从环境变量构建credentials字典
+        self.beijing_tz = pytz.timezone('Asia/Shanghai')  # 北京时区
         self.credentials_info = self._get_credentials_from_env()
         self.service = self._authenticate()
 
@@ -93,21 +95,19 @@ class GoogleCalendarManager:
     def create_event(self, summary, description="", start_time=None, end_time=None,
                      reminder_minutes=30, priority="medium", status="confirmed"):
         """
-        创建日历事件
-
-        Args:
-            summary: 事件标题
-            description: 事件描述
-            start_time: 开始时间 (datetime对象)
-            end_time: 结束时间 (datetime对象)
-            reminder_minutes: 提前提醒时间（分钟）
-            priority: 优先级 (low, medium, high)
-            status: 状态 (confirmed, tentative, cancelled)
+        创建日历事件 - 修复时区问题
         """
+        # 确保使用北京时间
         if not start_time:
-            start_time = datetime.now() + timedelta(hours=1)
+            start_time = datetime.now(self.beijing_tz) + timedelta(hours=1)
         if not end_time:
             end_time = start_time + timedelta(hours=1)
+
+        # 如果传入的是naive datetime，转换为北京时区
+        if start_time.tzinfo is None:
+            start_time = self.beijing_tz.localize(start_time)
+        if end_time.tzinfo is None:
+            end_time = self.beijing_tz.localize(end_time)
 
         # 优先级映射
         priority_map = {"low": "5", "medium": "3", "high": "1"}
@@ -117,11 +117,11 @@ class GoogleCalendarManager:
             'description': description,
             'start': {
                 'dateTime': start_time.isoformat(),
-                'timeZone': 'Asia/Shanghai',
+                'timeZone': 'Asia/Shanghai',  # 明确指定时区
             },
             'end': {
                 'dateTime': end_time.isoformat(),
-                'timeZone': 'Asia/Shanghai',
+                'timeZone': 'Asia/Shanghai',  # 明确指定时区
             },
             'reminders': {
                 'useDefault': False,
@@ -143,7 +143,7 @@ class GoogleCalendarManager:
                 "success": True,
                 "event_id": event['id'],
                 "html_link": event.get('htmlLink', ''),
-                "message": f"✅ 日历事件创建成功: {summary}"
+                "message": f"✅ 日历事件创建成功: {summary} (北京时间)"
             }
         except HttpError as error:
             return {
@@ -153,21 +153,21 @@ class GoogleCalendarManager:
 
     def query_events(self, days=30, max_results=50):
         """
-        查询未来一段时间内的日历事件
-
-        Args:
-            days: 查询未来多少天
-            max_results: 最大返回结果数
+        查询未来一段时间内的日历事件 - 修复时区问题
         """
-        # 修复：使用timezone-aware的datetime对象
-        now = datetime.now(timezone.utc).isoformat()
-        future = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+        # 使用北京时区的时间范围
+        now_beijing = datetime.now(self.beijing_tz)
+        future_beijing = now_beijing + timedelta(days=days)
+
+        # 转换为RFC3339格式（Google Calendar API要求的格式）
+        now_rfc3339 = now_beijing.isoformat()
+        future_rfc3339 = future_beijing.isoformat()
 
         try:
             events_result = self.service.events().list(
                 calendarId='primary',
-                timeMin=now,
-                timeMax=future,
+                timeMin=now_rfc3339,
+                timeMax=future_rfc3339,
                 maxResults=max_results,
                 singleEvents=True,
                 orderBy='startTime'
@@ -179,7 +179,7 @@ class GoogleCalendarManager:
                 return {
                     "success": True,
                     "events": [],
-                    "message": "📭 未来{}天内没有日历事件".format(days)
+                    "message": f"📭 未来{days}天内没有日历事件"
                 }
 
             formatted_events = []
@@ -188,6 +188,12 @@ class GoogleCalendarManager:
                 end = event['end'].get('dateTime', event['end'].get('date'))
                 priority = event.get('extendedProperties', {}).get('private', {}).get('priority', 'medium')
                 status = event.get('extendedProperties', {}).get('private', {}).get('status', 'confirmed')
+
+                # 转换时间为北京时间显示
+                if 'T' in start:  # 这是日期时间，不是全天事件
+                    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    start_beijing = start_dt.astimezone(self.beijing_tz)
+                    start = start_beijing.strftime('%Y-%m-%d %H:%M:%S')
 
                 formatted_events.append({
                     'id': event['id'],
@@ -203,7 +209,7 @@ class GoogleCalendarManager:
                 "success": True,
                 "events": formatted_events,
                 "count": len(formatted_events),
-                "message": f"📅 找到{len(formatted_events)}个未来{days}天内的事件"
+                "message": f"📅 找到{len(formatted_events)}个未来{days}天内的事件 (北京时间)"
             }
 
         except HttpError as error:
@@ -211,6 +217,19 @@ class GoogleCalendarManager:
                 "success": False,
                 "error": f"❌ 查询日历事件失败: {error}"
             }
+
+    def get_current_time_info(self):
+        """获取当前时间信息 - 用于调试时区问题"""
+        utc_now = datetime.now(timezone.utc)
+        beijing_now = datetime.now(self.beijing_tz)
+        server_now = datetime.now()
+
+        return {
+            "utc_time": utc_now.strftime('%Y-%m-%d %H:%M:%S %Z'),
+            "beijing_time": beijing_now.strftime('%Y-%m-%d %H:%M:%S %Z'),
+            "server_time": server_now.strftime('%Y-%m-%d %H:%M:%S'),
+            "server_timezone": str(server_now.tzinfo) if server_now.tzinfo else "None (naive)"
+        }
 
     def update_event_status(self, event_id, status="completed"):
         """更新事件状态"""
