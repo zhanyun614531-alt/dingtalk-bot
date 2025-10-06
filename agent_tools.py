@@ -872,6 +872,7 @@ class DeepseekAgent:
 3. JSON格式必须严格符合上面的示例
 4. 时间格式：YYYY-MM-DD HH:MM (24小时制)，日期格式：YYYY-MM-DD
 5. 优先级：low(低), medium(中), high(高)
+6. 当用户一次请求多个任务时，返回一个包含多个工具调用的JSON数组
 
 示例：
 用户：删除10月份的所有任务
@@ -882,13 +883,19 @@ AI：```json
 AI：```json
 {"action": "delete_events_by_time_range", "parameters": {"start_date": "2025-10-06", "end_date": "2025-10-12"}}
 ```
-用户：创建任务：周五前完成报告
+用户：创建任务：周五前完成报告，并查看今天的天气
 AI：```json
-{"action": "create_task", "parameters": {"title": "完成报告", "notes": "周五前完成报告", "due_date": "2025-10-11 18:00", "reminder_minutes": 60, "priority": "medium"}}
+[
+    {"action": "create_task", "parameters": {"title": "完成报告", "notes": "周五前完成报告", "due_date": "2025-10-11 18:00", "reminder_minutes": 60, "priority": "medium"}},
+    {"action": "get_weather", "parameters": {"city": "北京"}}
+]
 ```
-用户：查看下周的日程
+用户：查看下周的日程和所有待办任务
 AI：```json
-{"action": "query_events", "parameters": {"days": 7, "max_results": 10}}
+[
+{"action": "query_events", "parameters": {"days": 7, "max_results": 10}},
+{"action": "query_tasks", "parameters": {"show_completed": false, "max_results": 20}}
+]
 ```
 用户：今天天气怎么样
 AI：```json
@@ -1202,8 +1209,8 @@ AI：```json
             print(error_msg)
             return error_msg
 
-    def extract_tool_call(self, llm_response):
-        """从LLM响应中提取工具调用指令"""
+    def extract_tool_calls(self, llm_response):
+        """从LLM响应中提取工具调用指令 - 支持多个工具调用"""
         print(f"🔍 解析LLM响应: {llm_response}")
 
         if "```json" in llm_response and "```" in llm_response:
@@ -1213,13 +1220,30 @@ AI：```json
                 json_str = llm_response[start:end].strip()
                 print(f"📦 提取到JSON代码块: {json_str}")
 
-                tool_data = json.loads(json_str)
-                if isinstance(tool_data, dict) and "action" in tool_data and "parameters" in tool_data:
-                    print(f"✅ 成功解析工具调用: {tool_data['action']}")
-                    return tool_data
-            except json.JSONDecodeError as e:
-                print(f"❌ JSON解析失败: {e}")
-                return None
+                # 尝试解析为单个工具调用
+                try:
+                    tool_data = json.loads(json_str)
+                    if isinstance(tool_data, dict) and "action" in tool_data and "parameters" in tool_data:
+                        print(f"✅ 成功解析单个工具调用: {tool_data['action']}")
+                        return [tool_data]
+                except json.JSONDecodeError:
+                    pass
+
+                # 尝试解析为多个工具调用（数组）
+                try:
+                    tool_list = json.loads(json_str)
+                    if isinstance(tool_list, list):
+                        valid_tools = []
+                        for tool in tool_list:
+                            if isinstance(tool, dict) and "action" in tool and "parameters" in tool:
+                                valid_tools.append(tool)
+                        if valid_tools:
+                            print(f"✅ 成功解析 {len(valid_tools)} 个工具调用")
+                            return valid_tools
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON解析失败: {e}")
+                    return None
+
             except Exception as e:
                 print(f"❌ 提取工具调用失败: {e}")
                 return None
@@ -1320,7 +1344,7 @@ AI：```json
             return error_msg
 
     def process_request(self, user_input):
-        """处理用户请求"""
+        """处理用户请求 - 支持多个工具调用"""
         print(f"👤 用户输入: {user_input}")
 
         messages = [
@@ -1339,11 +1363,29 @@ AI：```json
             print(f"🤖 LLM原始响应: {llm_response}")
 
             # 检查工具调用
-            tool_data = self.extract_tool_call(llm_response)
-            if tool_data:
-                print(f"🔧 检测到工具调用: {tool_data['action']}")
-                tool_result = self.call_tool(tool_data["action"], tool_data["parameters"])
-                return tool_result, True
+            tool_calls = self.extract_tool_calls(llm_response)
+            if tool_calls:
+                print(f"🔧 检测到 {len(tool_calls)} 个工具调用")
+
+                results = []
+                for i, tool_data in enumerate(tool_calls, 1):
+                    print(f"🔄 执行第 {i}/{len(tool_calls)} 个工具: {tool_data['action']}")
+                    tool_result = self.call_tool(tool_data["action"], tool_data["parameters"])
+                    results.append({
+                        "tool": tool_data["action"],
+                        "result": tool_result
+                    })
+                    print(f"✅ 第 {i} 个工具执行完成")
+
+                # 格式化多个工具的执行结果
+                if len(results) == 1:
+                    return results[0]["result"], True
+                else:
+                    combined_result = "🎯 多任务执行完成：\n\n"
+                    for i, result in enumerate(results, 1):
+                        combined_result += f"{i}. {result['tool']}:\n"
+                        combined_result += f"   {result['result']}\n\n"
+                    return combined_result, True
             else:
                 print("💬 无工具调用，直接返回LLM响应")
                 return llm_response, False
@@ -1359,7 +1401,27 @@ def smart_assistant(user_input):
     result, tool_used = agent.process_request(user_input)
     return result
 
-# 测试函数
+# 测试函数 - 添加多任务测试
+def test_multiple_tasks():
+    """测试多任务功能"""
+    print("🧪 测试多任务功能")
+    print("=" * 50)
+    test_cases = [
+        "创建任务：周五前完成产品设计文档，并查看北京天气",
+        "查看我未来一周的日程安排和所有待办任务",
+        "创建日历事件：明天下午2点团队会议，并创建一个高优先级任务：准备会议材料",
+        "删除10月份的所有任务，并查询今天的天气",
+    ]
+
+    for i, test_case in enumerate(test_cases, 1):
+        print(f"\n{i}. 测试: {test_case}")
+        try:
+            result = smart_assistant(test_case)
+            print(f"结果: {result}")
+        except Exception as e:
+            print(f"❌ 测试失败: {e}")
+        print("-" * 30)
+
 def test_all_features():
     """测试所有功能"""
     test_cases = [
@@ -1390,5 +1452,9 @@ def test_all_features():
         print("-" * 30)
 
 if __name__ == '__main__':
+    # 测试多任务功能
+    test_multiple_tasks()
+
     # 测试所有功能
     test_all_features()
+
