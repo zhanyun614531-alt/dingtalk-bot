@@ -292,7 +292,7 @@ HTML格式要求：
             )
             html_content = response.choices[0].message.content.strip()
             print(f"✅ 生成HTML报告（{len(html_content)} 字符）")
-            
+    
             # 清理HTML内容
             cleaned_html = self.clean_html_content(html_content)
             return cleaned_html
@@ -353,7 +353,7 @@ HTML格式要求：
     async def generate_stock_report(self, stock_name_or_code):
         """生成股票分析报告的主方法（异步版本）"""
         print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
-    
+
         # 获取HTML内容
         html_content = self.get_html_from_doubao(stock_name_or_code)
         if html_content:
@@ -1802,6 +1802,7 @@ async def test_playwright_async():
     except Exception as e:
         return f"Playwright异步测试失败: {str(e)}"
 
+
 # 测试函数
 async def test_all_features():
     """测试所有功能"""
@@ -1841,6 +1842,7 @@ async def test_all_features():
         except Exception as e:
             print(f"❌ 测试失败: {e}")
         print("-" * 30)
+
 
 if __name__ == '__main__':
     # 测试所有功能
