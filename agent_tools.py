@@ -277,9 +277,9 @@ HTML格式要求：
     def get_html_from_doubao(self, stock_name_or_code):
         """从豆包获取股票分析HTML报告"""
         print(f"📝 请求豆包生成 {stock_name_or_code} 的股票分析报告...")
-
+    
         user_prompt = f"请为股票 '{stock_name_or_code}' 生成一份完整的专业股票分析报告。"
-
+    
         try:
             response = self.doubao_client.chat.completions.create(
                 model=self.model_id,
@@ -288,17 +288,20 @@ HTML格式要求：
                     {"role": "user", "content": user_prompt}
                 ],
                 max_tokens=15000,
-                temperature=0.3  # 降低随机性，确保报告的专业性和一致性
+                temperature=0.3
             )
             html_content = response.choices[0].message.content.strip()
             print(f"✅ 生成HTML报告（{len(html_content)} 字符）")
-
+            
             # 清理HTML内容
             cleaned_html = self.clean_html_content(html_content)
             return cleaned_html
-
+    
         except Exception as e:
-            print(f"❌ 豆包调用失败: {e}")
+            print(f"❌ 豆包调用失败: {str(e)}")
+            # 如果是API错误，可能有更详细的错误信息
+            if hasattr(e, 'response'):
+                print(f"🔧 API响应详情: {e.response}")
             return None
 
     async def html_to_pdf(self, html_content):
@@ -348,24 +351,24 @@ HTML格式要求：
             return None
 
     async def generate_stock_report(self, stock_name_or_code):
-    """生成股票分析报告的主方法（异步版本）"""
-    print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
-
-    # 获取HTML内容
-    html_content = self.get_html_from_doubao(stock_name_or_code)
-    if html_content:
-        print(f"✅ 成功获取HTML内容，长度: {len(html_content)} 字符")
-        # 转换为PDF二进制数据
-        pdf_binary = await self.html_to_pdf(html_content)
-        if pdf_binary:
-            print(f"✅ {stock_name_or_code} 分析报告生成成功！PDF大小: {len(pdf_binary)} 字节")
-            return pdf_binary
+        """生成股票分析报告的主方法（异步版本）"""
+        print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
+    
+        # 获取HTML内容
+        html_content = self.get_html_from_doubao(stock_name_or_code)
+        if html_content:
+            print(f"✅ 成功获取HTML内容，长度: {len(html_content)} 字符")
+            # 转换为PDF二进制数据
+            pdf_binary = await self.html_to_pdf(html_content)
+            if pdf_binary:
+                print(f"✅ {stock_name_or_code} 分析报告生成成功！PDF大小: {len(pdf_binary)} 字节")
+                return pdf_binary
+            else:
+                print(f"❌ {stock_name_or_code} PDF转换失败")
+                return None
         else:
-            print(f"❌ {stock_name_or_code} PDF转换失败")
+            print(f"❌ 无法获取 {stock_name_or_code} 的HTML内容，可能是豆包API调用失败")
             return None
-    else:
-        print(f"❌ 无法获取 {stock_name_or_code} 的HTML内容，可能是豆包API调用失败")
-        return None
 
 
 class GoogleCalendarManager:
