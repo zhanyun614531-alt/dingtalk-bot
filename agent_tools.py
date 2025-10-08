@@ -307,31 +307,32 @@ HTML格式要求：
     async def html_to_pdf(self, html_content):
         """
         使用Playwright将HTML转换为PDF二进制数据（异步版本）
-
-        参数:
-        - html_content: HTML内容
-
-        返回:
-        - PDF二进制数据，如果失败则返回None
         """
         print("📄 启动浏览器，转换HTML为PDF...")
-
+    
         try:
+            # 添加浏览器路径检查
+            import os
+            from playwright.async_api import async_playwright
+            
+            print(f"🔍 检查Playwright浏览器路径...")
+            
             async with async_playwright() as p:
+                # 检查可用的浏览器类型
+                print(f"🔍 可用浏览器: {p.chromium, p.firefox, p.webkit}")
+                
                 # 启动浏览器
+                print("🚀 启动Chromium浏览器...")
                 browser = await p.chromium.launch(
                     headless=True,
-                    args=['--no-sandbox', '--disable-dev-shm-usage']  # 为部署环境添加的参数
+                    args=['--no-sandbox', '--disable-dev-shm-usage']
                 )
+                
                 page = await browser.new_page()
-
-                # 设置页面尺寸为A4
                 await page.set_viewport_size({"width": 1200, "height": 1697})
-
-                # 加载HTML内容
                 await page.set_content(html_content, wait_until='networkidle')
-
-                # 生成PDF二进制数据
+    
+                # 生成PDF
                 pdf_options = {
                     "format": 'A4',
                     "print_background": True,
@@ -339,15 +340,18 @@ HTML格式要求：
                     "display_header_footer": False,
                     "prefer_css_page_size": True
                 }
-
+    
                 pdf_data = await page.pdf(**pdf_options)
                 await browser.close()
-
+    
                 print(f"✅ PDF二进制数据生成成功，大小: {len(pdf_data)} 字节")
                 return pdf_data
-
+    
         except Exception as e:
             print(f"❌ PDF生成失败: {e}")
+            # 添加更详细的错误信息
+            import traceback
+            print(f"📋 详细错误信息: {traceback.format_exc()}")
             return None
 
     async def generate_stock_report(self, stock_name_or_code):
