@@ -4,11 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: |
-      pip install -r requirements.txt
-      #python -m playwright install chromium
-      # 移除 playwright install-deps 命令
-      playwright install chromium
-      playwright install-deps
+      "pip install -r requirements.txt && playwright install --with-deps chromium"
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
