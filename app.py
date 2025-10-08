@@ -15,15 +15,34 @@ import agent_tools
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+from contextlib import asynccontextmanager
 
 # 加载环境变量
 load_dotenv()
+
+# 线程池执行器 - 用于处理CPU密集型任务
+thread_pool = ThreadPoolExecutor(max_workers=5)
+
+# 存储处理中的任务
+processing_tasks = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI 生命周期事件管理器"""
+    # 启动时执行的操作
+    print("🚀 钉钉机器人服务启动中...")
+    yield
+    # 关闭时执行的操作
+    print("🛑 钉钉机器人服务关闭中...")
+    thread_pool.shutdown(wait=True)
+    print("✅ 线程池已关闭")
 
 # 初始化FastAPI应用
 app = FastAPI(
     title="钉钉机器人服务",
     description="基于FastAPI的钉钉机器人智能助手",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 配置日志
@@ -33,15 +52,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# 线程池执行器 - 用于处理CPU密集型任务
-thread_pool = ThreadPoolExecutor(max_workers=5)
-
 # 从环境变量获取钉钉机器人信息
 ROBOT_ACCESS_TOKEN = os.getenv('ROBOT_ACCESS_TOKEN')
 ROBOT_SECRET = os.getenv('ROBOT_SECRET')
-
-# 存储处理中的任务
-processing_tasks = {}
 
 def sync_llm_processing(conversation_id, user_input, at_user_ids):
     """同步处理LLM任务（在线程中运行）"""
@@ -262,16 +275,11 @@ async def get_server_ip():
     except Exception as e:
         return JSONResponse({"error": f"无法获取服务器IP: {str(e)}"})
 
-# 应用关闭时清理资源
-@app.on_event("shutdown")
-async def shutdown_event():
-    thread_pool.shutdown(wait=True)
-
 if __name__ == '__main__':
     import uvicorn
     port = int(os.getenv('DINGTALK_PORT', 8000))
     uvicorn.run(
-        "main:app",
+        "app:app",  # 注意这里改为 app:app
         host="0.0.0.0",
         port=port,
         workers=1,
