@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse
 import hmac
 import hashlib
 import base64
@@ -7,17 +8,23 @@ import urllib.parse
 import json
 import requests
 import os
-import threading
 import time
 import logging
 import re
 import agent_tools
+from typing import Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 # 加载环境变量
 load_dotenv()
 
-# 初始化Flask应用
-app = Flask(__name__)
+# 初始化FastAPI应用
+app = FastAPI(
+    title="钉钉机器人服务",
+    description="基于FastAPI的钉钉机器人智能助手",
+    version="1.0.0"
+)
 
 # 配置日志
 logging.basicConfig(
@@ -26,6 +33,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+# 线程池执行器 - 用于处理CPU密集型任务
+thread_pool = ThreadPoolExecutor(max_workers=5)
+
 # 从环境变量获取钉钉机器人信息
 ROBOT_ACCESS_TOKEN = os.getenv('ROBOT_ACCESS_TOKEN')
 ROBOT_SECRET = os.getenv('ROBOT_SECRET')
@@ -33,8 +43,8 @@ ROBOT_SECRET = os.getenv('ROBOT_SECRET')
 # 存储处理中的任务
 processing_tasks = {}
 
-def async_process_llm_message(conversation_id, user_input, at_user_ids):
-    """异步处理LLM消息"""
+def sync_llm_processing(conversation_id, user_input, at_user_ids):
+    """同步处理LLM任务（在线程中运行）"""
     try:
         print(f"【异步任务】开始处理: {user_input}")
         
@@ -42,28 +52,45 @@ def async_process_llm_message(conversation_id, user_input, at_user_ids):
         ark_key = os.environ.get('ARK_API_KEY')
         if not ark_key:
             error_msg = "Test1：ARK_API_KEY未设置"
-            send_official_message(error_msg, at_user_ids=at_user_ids)
+            asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
             return
 
-        # 调用智能助手
+        # 调用智能助手（同步函数）
         result = agent_tools.smart_assistant(user_input)
         
         if result:
             final_result = f"Test1：{result}"
-            send_official_message(final_result, at_user_ids=at_user_ids)
+            asyncio.run(send_official_message(final_result, at_user_ids=at_user_ids))
         else:
             error_msg = "Test1：LLM返回了空内容"
-            send_official_message(error_msg, at_user_ids=at_user_ids)
+            asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
             
     except Exception as e:
         error_msg = f"Test1：处理出错: {str(e)}"
         print(f"【异步任务错误】{error_msg}")
-        send_official_message(error_msg, at_user_ids=at_user_ids)
+        asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
     finally:
         if conversation_id in processing_tasks:
             del processing_tasks[conversation_id]
 
-def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=False):
+async def async_process_llm_message(conversation_id, user_input, at_user_ids):
+    """异步包装器，在线程池中运行同步任务"""
+    loop = asyncio.get_event_loop()
+    
+    # 记录任务开始
+    processing_tasks[conversation_id] = {
+        "start_time": time.time(),
+        "user_input": user_input
+    }
+    
+    # 在线程池中运行同步的LLM处理
+    await loop.run_in_executor(
+        thread_pool, 
+        sync_llm_processing, 
+        conversation_id, user_input, at_user_ids
+    )
+
+async def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=False):
     """发送钉钉消息"""
     try:
         timestamp = str(round(time.time() * 1000))
@@ -99,7 +126,13 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
         }
 
         headers = {'Content-Type': 'application/json'}
-        resp = requests.post(url, json=body, headers=headers, timeout=10)
+        
+        # 使用异步HTTP客户端会更好，但这里保持简单使用requests
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, 
+            lambda: requests.post(url, json=body, headers=headers, timeout=10)
+        )
         
         if resp.status_code == 200:
             result = resp.json()
@@ -108,6 +141,7 @@ def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=Fals
             return False
             
     except Exception as e:
+        print(f"发送消息异常: {e}")
         return False
 
 def process_command(command):
@@ -138,18 +172,22 @@ def process_command(command):
     else:
         return f"Test1：暂不支持该指令：{command}"
 
-@app.route('/')
-def home():
+@app.get("/", response_class=HTMLResponse)
+async def home():
     return "钉钉机器人服务运行中 ✅"
 
-@app.route('/dingtalk/webhook', methods=['GET', 'POST'])
-def webhook():
-    """钉钉消息接收接口"""
-    if request.method == 'GET':
-        return "钉钉机器人服务运行中 ✅", 200
+@app.get("/health")
+async def health():
+    return JSONResponse({"status": "healthy", "service": "dingtalk-bot"})
 
+@app.api_route("/dingtalk/webhook", methods=["GET", "POST"])
+async def webhook(request: Request, background_tasks: BackgroundTasks):
+    """钉钉消息接收接口"""
+    if request.method == "GET":
+        return JSONResponse({"status": "服务运行中"})
+    
     try:
-        data = request.json
+        data = await request.json()
 
         # 提取消息内容
         if 'text' in data and 'content' in data['text']:
@@ -163,41 +201,79 @@ def webhook():
             # 处理非LLM指令（立即响应）
             if not command.startswith("Test1 LLM"):
                 result = process_command(command)
-                send_official_message(result, at_user_ids=at_user_ids)
-                return jsonify({"success": True})
+                await send_official_message(result, at_user_ids=at_user_ids)
+                return JSONResponse({"success": True})
 
             # 处理LLM指令（异步）
             else:
                 # 立即响应"处理中"消息
                 immediate_response = "Test1：正在思考中，请稍等片刻... ⏳"
-                send_official_message(immediate_response, at_user_ids=at_user_ids)
+                await send_official_message(immediate_response, at_user_ids=at_user_ids)
                 
-                # 启动异步处理线程
+                # 提取纯命令
                 pure_command = re.sub(r'^Test1\s*LLM\s*', '', command).strip()
-                thread = threading.Thread(
-                    target=async_process_llm_message,
-                    args=(conversation_id, pure_command, at_user_ids)
+                
+                # 使用BackgroundTasks处理异步任务
+                background_tasks.add_task(
+                    async_process_llm_message, 
+                    conversation_id, 
+                    pure_command, 
+                    at_user_ids
                 )
-                thread.daemon = True
-                thread.start()
                 
-                # 记录处理中的任务
-                processing_tasks[conversation_id] = {
-                    "start_time": time.time(),
-                    "user_input": pure_command
-                }
-                
-                return jsonify({"success": True, "status": "processing"})
+                return JSONResponse({"success": True, "status": "processing"})
 
-        return jsonify({"success": True})
+        return JSONResponse({"success": True})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=f"处理请求出错: {str(e)}")
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "service": "dingtalk-bot"})
+@app.get("/debug/tasks")
+async def debug_tasks():
+    """调试接口：查看当前处理中的任务"""
+    now = time.time()
+    active_tasks = {}
+    
+    for task_id, task_info in processing_tasks.items():
+        duration = now - task_info['start_time']
+        active_tasks[task_id] = {
+            "user_input": task_info['user_input'],
+            "duration_seconds": round(duration, 1),
+            "status": "running" if duration < 300 else "stuck"
+        }
+    
+    return JSONResponse({
+        "active_tasks_count": len(active_tasks),
+        "server_time": now,
+        "active_tasks": active_tasks
+    })
+
+@app.get("/server-ip")
+async def get_server_ip():
+    """获取服务器公网IP"""
+    try:
+        response = requests.get('https://api.ipify.org?format=json', timeout=10)
+        if response.status_code == 200:
+            server_ip = response.json()['ip']
+            return JSONResponse({
+                "render_server_public_ip": server_ip,
+                "note": "将此IP添加到钉钉白名单"
+            })
+    except Exception as e:
+        return JSONResponse({"error": f"无法获取服务器IP: {str(e)}"})
+
+# 应用关闭时清理资源
+@app.on_event("shutdown")
+async def shutdown_event():
+    thread_pool.shutdown(wait=True)
 
 if __name__ == '__main__':
-    port = int(os.getenv('DINGTALK_PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    import uvicorn
+    port = int(os.getenv('DINGTALK_PORT', 8000))
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        workers=1,
+        reload=False
+    )
