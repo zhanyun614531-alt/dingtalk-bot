@@ -239,6 +239,7 @@ async def sync_llm_processing(conversation_id, user_input, at_user_ids):
             await send_official_message(error_msg, at_user_ids=at_user_ids)
             return
 
+        # 正确等待异步函数
         result = await agent_tools.smart_assistant(user_input)
 
         if result:
@@ -288,10 +289,8 @@ async def async_process_llm_message(conversation_id, user_input, at_user_ids):
         "user_input": user_input
     }
 
-    await loop.run_in_executor(
-        thread_pool,
-        lambda: asyncio.run(sync_llm_processing(conversation_id, user_input, at_user_ids))
-    )
+    # 使用 asyncio.create_task 来运行异步函数
+    asyncio.create_task(sync_llm_processing(conversation_id, user_input, at_user_ids))
 
 
 async def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_all=False):
@@ -340,8 +339,8 @@ async def send_official_message(msg, at_user_ids=None, at_mobiles=None, is_at_al
         return False
 
 
-def process_command(command):
-    """处理用户指令"""
+async def process_command(command):
+    """处理用户指令（异步版本）"""
     original_msg = command.strip()
     key = "Test1"
     raw_command = re.sub(re.escape(key), '', original_msg)
@@ -354,10 +353,17 @@ def process_command(command):
     elif command.startswith("LLM"):
         try:
             pure_command = re.sub(r'^LLM', '', command).strip()
-            response = asyncio.run(agent_tools.smart_assistant(pure_command))
+            # 正确等待异步函数
+            response = await agent_tools.smart_assistant(pure_command)
 
             if response is None:
                 return "Test1：LLM处理超时或无响应"
+            elif isinstance(response, dict) and response.get("type") == "text":
+                content = response.get("content", "")
+                if not content.strip():
+                    return "Test1：LLM返回了空内容"
+                else:
+                    return f"Test1：{content}"
             elif not response.strip():
                 return "Test1：LLM返回了空内容"
             else:
@@ -406,7 +412,8 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
             at_user_ids = [user['dingtalkId'] for user in data.get('atUsers', [])]
 
             if not command.startswith("Test1 LLM"):
-                result = process_command(command)
+                # 使用异步版本的 process_command
+                result = await process_command(command)
                 await send_official_message(result, at_user_ids=at_user_ids)
                 return JSONResponse({"success": True})
             else:
@@ -415,12 +422,8 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
 
                 pure_command = re.sub(r'^Test1\s*LLM\s*', '', command).strip()
 
-                background_tasks.add_task(
-                    async_process_llm_message,
-                    conversation_id,
-                    pure_command,
-                    at_user_ids
-                )
+                # 使用异步任务
+                asyncio.create_task(sync_llm_processing(conversation_id, pure_command, at_user_ids))
 
                 return JSONResponse({"success": True, "status": "processing"})
 
