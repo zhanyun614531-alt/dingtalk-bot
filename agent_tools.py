@@ -11,9 +11,367 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2.credentials import Credentials
 import pytz
+from playwright.sync_api import sync_playwright
+import re
 
 # 加载环境变量
 load_dotenv()
+
+
+class StockAnalysisPDFAgent:
+    """股票分析PDF生成器 - 纯内存操作"""
+
+    def __init__(self):
+        # 豆包客户端配置
+        self.doubao_client = OpenAI(
+            base_url="https://ark.cn-beijing.volces.com/api/v3/bots",
+            api_key=os.environ.get("ARK_API_KEY")
+        )
+        self.model_id = "bot-20250907084333-cbvff"
+
+        # 系统提示词 - AI金融分析师角色
+        self.system_prompt = """你是一位顶级的金融分析师，你的任务是为客户撰写一份专业、深入、数据驱动且观点明确的股票研究报告。你的分析必须客观、严谨，并结合基本面、技术面和市场情绪进行综合判断。每个部份不超过200字。
+
+请严格遵循以下结构和要求，生成一份完整的HTML格式的股票分析报告：
+
+报告结构与格式要求：
+
+1. 报告摘要 (Report Summary)
+   - 关键投资亮点：以要点形式列出3-5个最重要的投资亮点或关注点
+   - 投资者画像：指出该股票适合哪类投资者，并说明建议的投资时间周期
+
+2. 深度分析 (In-Depth Analysis)
+   2.1 公司与行业分析
+     - 商业模式：公司如何创造收入？核心产品、服务和主要客户群体
+     - 行业格局与竞争优势：行业驱动因素、市场规模、增长前景、主要竞争对手、护城河分析
+
+   2.2 财务健康状况与业绩
+     - 近期业绩：注明最近财报日期，总结业绩超预期/不及预期的关键点
+     - 核心财务趋势：过去3-5年收入、净利润和利润率趋势
+     - 关键财务比率分析：提供P/S、P/B、PEG、债务权益比等，并与行业比较
+
+   2.3 增长前景与催化剂
+     - 增长战略：新产品发布、市场扩张、并购等计划
+     - 潜在催化剂：未来6-12个月内可能影响股价的事件
+
+   2.4 技术分析与市场情绪
+     - 价格行为与趋势：当前趋势、移动平均线状态
+     - 关键价位：支撑位和阻力位分析
+     - 成交量分析：近期成交量趋势
+     - 市场情绪与持仓：分析师评级分布、机构持仓趋势
+
+   2.5 风险评估
+     - 核心业务风险：主要经营风险
+     - 宏观与行业风险：经济周期、政策变化等影响
+     - 危险信号：需要警惕的负面信号
+
+HTML格式要求：
+- 使用专业的金融报告样式
+- 包含清晰的章节分隔
+- 重要数据使用突出显示
+- 风险提示使用醒目标记
+- 确保响应式设计，适应PDF输出
+
+重要：直接输出完整的HTML代码，不要包含任何代码块标记（如```html或```）"""
+
+    def clean_html_content(self, html_content):
+        """清理HTML内容中的代码块标记和其他不需要的字符"""
+        print("🧹 清理HTML内容中的代码块标记...")
+
+        # 移除代码块标记
+        cleaned_content = re.sub(r'^```html\s*', '', html_content)
+        cleaned_content = re.sub(r'\s*```$', '', cleaned_content)
+        cleaned_content = cleaned_content.replace('```html', '').replace('```', '')
+
+        # 确保内容以正确的HTML结构开始
+        if not cleaned_content.strip().startswith('<!DOCTYPE html>') and not cleaned_content.strip().startswith(
+                '<html'):
+            # 包装成完整的专业金融报告HTML结构
+            cleaned_content = self.wrap_financial_report_html(cleaned_content)
+
+        print(f"✅ HTML内容清理完成，长度: {len(cleaned_content)} 字符")
+        return cleaned_content
+
+    def wrap_financial_report_html(self, content):
+        """将内容包装成专业的金融报告HTML结构"""
+        current_date = datetime.now().strftime("%Y年%m月%d日")
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票投资分析报告</title>
+    <style>
+        /* 专业金融报告样式 */
+        body {{ 
+            font-family: 'Arial', 'Microsoft YaHei', 'PingFang SC', sans-serif; 
+            margin: 0;
+            padding: 0;
+            color: #333;
+            line-height: 1.6;
+            background: #f8f9fa;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }}
+        .header h1 {{
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 700;
+        }}
+        .header .subtitle {{
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }}
+        .report-meta {{
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            font-size: 14px;
+            opacity: 0.8;
+        }}
+        .content {{
+            padding: 40px;
+        }}
+        .section {{
+            margin-bottom: 40px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        .section-header {{
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 18px;
+        }}
+        .section-content {{
+            padding: 20px;
+        }}
+        .highlight-box {{
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }}
+        .risk-warning {{
+            background: #ffeaa7;
+            border-left: 4px solid #fdcb6e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }}
+        .data-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }}
+        .data-table th,
+        .data-table td {{
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }}
+        .data-table th {{
+            background: #f8f9fa;
+            font-weight: 600;
+        }}
+        .key-metric {{
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin: 2px;
+            font-weight: 600;
+        }}
+        .positive {{
+            background: #27ae60;
+        }}
+        .negative {{
+            background: #e74c3c;
+        }}
+        .neutral {{
+            background: #95a5a6;
+        }}
+        .footer {{
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+            font-size: 12px;
+            margin-top: 40px;
+        }}
+        h2 {{
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-top: 30px;
+        }}
+        h3 {{
+            color: #34495e;
+            margin-top: 20px;
+        }}
+        ul, ol {{
+            margin: 15px 0;
+            padding-left: 25px;
+        }}
+        li {{
+            margin-bottom: 8px;
+        }}
+        .investment-rating {{
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            border-radius: 8px;
+            margin: 20px 0;
+        }}
+        @media print {{
+            body {{ background: white; }}
+            .container {{ box-shadow: none; }}
+            .header {{ background: #2c3e50 !important; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 股票投资分析报告</h1>
+            <div class="subtitle">专业深度分析 · 数据驱动决策</div>
+            <div class="report-meta">
+                <span>报告日期：{current_date}</span>
+                <span>分析师：AI金融研究团队</span>
+            </div>
+        </div>
+
+        <div class="content">
+            {content}
+        </div>
+
+        <div class="footer">
+            <p>免责声明：本报告基于公开信息分析，仅供参考，不构成投资建议。投资有风险，入市需谨慎。</p>
+            <p>报告生成时间：{current_date} • AI金融分析系统</p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+    def get_html_from_doubao(self, stock_name_or_code):
+        """从豆包获取股票分析HTML报告"""
+        print(f"📝 请求豆包生成 {stock_name_or_code} 的股票分析报告...")
+
+        user_prompt = f"请为股票 '{stock_name_or_code}' 生成一份完整的专业股票分析报告。"
+
+        try:
+            response = self.doubao_client.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=15000,
+                temperature=0.3  # 降低随机性，确保报告的专业性和一致性
+            )
+            html_content = response.choices[0].message.content.strip()
+            print(f"✅ 生成HTML报告（{len(html_content)} 字符）")
+
+            # 清理HTML内容
+            cleaned_html = self.clean_html_content(html_content)
+            return cleaned_html
+
+        except Exception as e:
+            print(f"❌ 豆包调用失败: {e}")
+            return None
+
+    def html_to_pdf(self, html_content):
+        """
+        使用Playwright将HTML转换为PDF二进制数据
+
+        参数:
+        - html_content: HTML内容
+
+        返回:
+        - PDF二进制数据，如果失败则返回None
+        """
+        print("📄 启动浏览器，转换HTML为PDF...")
+
+        try:
+            with sync_playwright() as p:
+                # 启动浏览器
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-dev-shm-usage']  # 为部署环境添加的参数
+                )
+                page = browser.new_page()
+
+                # 设置页面尺寸为A4
+                page.set_viewport_size({"width": 1200, "height": 1697})
+
+                # 加载HTML内容
+                page.set_content(html_content, wait_until='networkidle')
+
+                # 生成PDF二进制数据
+                pdf_options = {
+                    "format": 'A4',
+                    "print_background": True,
+                    "margin": {"top": "0.5in", "right": "0.5in", "bottom": "0.5in", "left": "0.5in"},
+                    "display_header_footer": False,
+                    "prefer_css_page_size": True
+                }
+
+                pdf_data = page.pdf(**pdf_options)
+                browser.close()
+
+                print(f"✅ PDF二进制数据生成成功，大小: {len(pdf_data)} 字节")
+                return pdf_data
+
+        except Exception as e:
+            print(f"❌ PDF生成失败: {e}")
+            return None
+
+    def generate_stock_report(self, stock_name_or_code):
+        """
+        生成股票分析报告的主方法
+
+        参数:
+        - stock_name_or_code: 股票名称或代码
+
+        返回:
+        - PDF二进制数据，如果失败则返回None
+        """
+        print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
+
+        # 获取HTML内容
+        html_content = self.get_html_from_doubao(stock_name_or_code)
+        if html_content:
+            # 转换为PDF二进制数据
+            pdf_binary = self.html_to_pdf(html_content)
+            if pdf_binary:
+                print(f"✅ {stock_name_or_code} 分析报告生成成功！")
+                return pdf_binary
+            else:
+                print(f"❌ {stock_name_or_code} PDF转换失败")
+                return None
+        else:
+            print(f"❌ 无法获取 {stock_name_or_code} 的HTML内容")
+            return None
 
 
 class GoogleCalendarManager:
@@ -829,7 +1187,7 @@ class GoogleCalendarManager:
 
 
 class DeepseekAgent:
-    """智能助手Agent - 修复工具调用问题"""
+    """智能助手Agent - 集成股票分析功能"""
 
     def __init__(self):
         self.client = OpenAI(
@@ -841,8 +1199,11 @@ class DeepseekAgent:
         # 初始化Google日历管理器
         self.calendar_manager = GoogleCalendarManager()
 
-        # 更新系统提示词 - 添加时间范围删除功能
-        self.system_prompt = """你是一个智能助手，具备工具调用能力。当用户请求涉及日历、任务、天气、计算或邮件时，你需要返回JSON格式的工具调用。
+        # 初始化股票分析代理
+        self.stock_agent = StockAnalysisPDFAgent()
+
+        # 更新系统提示词 - 添加股票分析功能
+        self.system_prompt = """你是一个智能助手，具备工具调用能力。当用户请求涉及日历、任务、天气、计算、邮件或股票分析时，你需要返回JSON格式的工具调用。
 
 可用工具：
 【日历事件功能】
@@ -861,10 +1222,13 @@ class DeepseekAgent:
 11. 按标题删除任务：{"action": "delete_task_by_title", "parameters": {"title_keyword": "任务标题关键词"}}
 12. 按时间范围删除任务：{"action": "delete_tasks_by_time_range", "parameters": {"start_date": "开始日期(YYYY-MM-DD)", "end_date": "结束日期(YYYY-MM-DD)", "show_completed": true}}
 
+【股票分析功能】
+13. 生成股票分析报告：{"action": "generate_stock_report", "parameters": {"stock_name": "股票名称或代码"}}
+
 【其他功能】
-13. 天气查询：{"action": "get_weather", "parameters": {"city": "城市名称"}}
-14. 计算器：{"action": "calculator", "parameters": {"expression": "数学表达式"}}
-15. 发送邮件：{"action": "send_email", "parameters": {"to": "收件邮箱", "subject": "邮件主题", "body": "邮件内容"}}
+14. 天气查询：{"action": "get_weather", "parameters": {"city": "城市名称"}}
+15. 计算器：{"action": "calculator", "parameters": {"expression": "数学表达式"}}
+16. 发送邮件：{"action": "send_email", "parameters": {"to": "收件邮箱", "subject": "邮件主题", "body": "邮件内容"}}
 
 重要规则：
 1. 当需要调用工具时，必须返回 ```json 和 ``` 包裹的JSON格式
@@ -872,8 +1236,13 @@ class DeepseekAgent:
 3. JSON格式必须严格符合上面的示例
 4. 时间格式：YYYY-MM-DD HH:MM (24小时制)，日期格式：YYYY-MM-DD
 5. 优先级：low(低), medium(中), high(高)
+6. 股票分析功能会返回PDF二进制数据，用于后续上传或其他操作
 
 示例：
+用户：生成腾讯控股的股票分析报告
+AI：```json
+{"action": "generate_stock_report", "parameters": {"stock_name": "腾讯控股"}}
+```
 用户：删除10月份的所有任务
 AI：```json
 {"action": "delete_tasks_by_time_range", "parameters": {"start_date": "2025-10-01", "end_date": "2025-10-31"}}
@@ -881,14 +1250,6 @@ AI：```json
 用户：清理下周的所有日历事件
 AI：```json
 {"action": "delete_events_by_time_range", "parameters": {"start_date": "2025-10-06", "end_date": "2025-10-12"}}
-```
-用户：创建任务：周五前完成报告
-AI：```json
-{"action": "create_task", "parameters": {"title": "完成报告", "notes": "周五前完成报告", "due_date": "2025-10-11 18:00", "reminder_minutes": 60, "priority": "medium"}}
-```
-用户：查看下周的日程
-AI：```json
-{"action": "query_events", "parameters": {"days": 7, "max_results": 10}}
 ```
 用户：今天天气怎么样
 AI：```json
@@ -916,7 +1277,8 @@ AI：```json
             return "请提供数学表达式"
 
         try:
-            allowed_chars = {'+', '-', '*', '/', '(', ')', '.', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+            allowed_chars = {'+', '-', '*', '/', '(', ')', '.', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8',
+                             '9'}
             if not all(c in allowed_chars for c in expression):
                 return "表达式包含不支持的字符"
             result = eval(expression)
@@ -976,6 +1338,34 @@ AI：```json
 
         except Exception as e:
             return f"❌ 邮件发送异常：{str(e)}"
+
+    # ========== 股票分析功能 ==========
+
+    def generate_stock_report(self, stock_name):
+        """
+        生成股票分析报告
+
+        参数:
+        - stock_name: 股票名称或代码
+
+        返回:
+        - PDF二进制数据，如果失败则返回None
+        """
+        print(f"📈 开始生成股票分析报告: {stock_name}")
+
+        try:
+            pdf_binary = self.stock_agent.generate_stock_report(stock_name)
+            if pdf_binary:
+                print(f"✅ 股票分析报告生成成功，大小: {len(pdf_binary)} 字节")
+                # 返回PDF二进制数据，用于后续上传或其他操作
+                return pdf_binary
+            else:
+                print("❌ 股票分析报告生成失败")
+                return None
+
+        except Exception as e:
+            print(f"❌ 生成股票分析报告时出错: {e}")
+            return None
 
     # ========== Google日历和任务相关方法 ==========
 
@@ -1298,6 +1688,21 @@ AI：```json
                     start_date=parameters.get("start_date"),
                     end_date=parameters.get("end_date")
                 )
+            elif action == "generate_stock_report":
+                # 股票分析工具返回PDF二进制数据
+                pdf_binary = self.generate_stock_report(parameters.get("stock_name", ""))
+                if pdf_binary:
+                    return {
+                        "success": True,
+                        "pdf_binary": pdf_binary,
+                        "message": f"✅ 股票分析报告生成成功，PDF大小: {len(pdf_binary)} 字节",
+                        "stock_name": parameters.get("stock_name", "")
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "❌ 股票分析报告生成失败"
+                    }
             elif action == "get_weather":
                 return self.get_weather(parameters.get("city", ""))
             elif action == "calculator":
@@ -1343,48 +1748,83 @@ AI：```json
             if tool_data:
                 print(f"🔧 检测到工具调用: {tool_data['action']}")
                 tool_result = self.call_tool(tool_data["action"], tool_data["parameters"])
-                return tool_result, True
+
+                # 特殊处理股票分析工具，返回PDF二进制数据
+                if tool_data["action"] == "generate_stock_report" and isinstance(tool_result,
+                                                                                 dict) and tool_result.get(
+                        "success"):
+                    return {
+                        "type": "stock_pdf",
+                        "success": True,
+                        "pdf_binary": tool_result.get("pdf_binary"),
+                        "message": tool_result.get("message"),
+                        "stock_name": tool_result.get("stock_name")
+                    }
+                else:
+                    return {
+                        "type": "text",
+                        "content": tool_result,
+                        "success": True
+                    }
             else:
                 print("💬 无工具调用，直接返回LLM响应")
-                return llm_response, False
+                return {
+                    "type": "text",
+                    "content": llm_response,
+                    "success": True
+                }
 
         except Exception as e:
             error_msg = f"处理请求时出错：{str(e)}"
             print(f"❌ {error_msg}")
-            return error_msg, False
+            return {
+                "type": "text",
+                "content": error_msg,
+                "success": False
+            }
 
 def smart_assistant(user_input):
-    """智能助手主函数"""
+    """智能助手主函数 - 返回包含类型信息的完整结果"""
     agent = DeepseekAgent()
-    result, tool_used = agent.process_request(user_input)
+    result = agent.process_request(user_input)
     return result
 
 # 测试函数
 def test_all_features():
     """测试所有功能"""
     test_cases = [
-    # 日历事件测试
-    "创建日历事件：明天下午2点团队会议，讨论项目进度，提前15分钟提醒我",
-    "查看我未来一周的日程安排",
+        # 日历事件测试
+        # "创建日历事件：明天下午2点团队会议，讨论项目进度，提前15分钟提醒我",
+        # "查看我未来一周的日程安排",
+        #
+        # # 任务管理测试
+        # "创建任务：周五前完成产品设计文档，这是一个高优先级的任务",
+        # "查看我所有的待办任务",
 
-    # 任务管理测试
-    "创建任务：周五前完成产品设计文档，这是一个高优先级的任务",
-    "创建任务：下周一提交月度报告，提前一天提醒我",
-    "查看我所有的待办任务",
+        # 股票分析测试
+        "生成腾讯控股的股票分析报告"
+        # "分析贵州茅台的股票情况",
 
-    # 时间范围删除测试
-    "删除10月份的所有任务",
-    "清理下周的所有日历事件",
+        # # 时间范围删除测试
+        # "删除10月份的所有任务",
+        # "清理下周的所有日历事件",
     ]
 
-    print("🧪 测试所有Google日历和任务功能")
+    print("🧪 测试所有功能")
     print("=" * 50)
 
     for i, test_case in enumerate(test_cases, 1):
         print(f"\n{i}. 测试: {test_case}")
         try:
             result = smart_assistant(test_case)
-            print(f"结果: {result}")
+            if result["type"] == "stock_pdf":
+                print(f"✅ 股票分析报告生成成功")
+                print(f"   股票名称: {result.get('stock_name')}")
+                print(f"   PDF大小: {len(result.get('pdf_binary', b''))} 字节")
+                print(f"   消息: {result.get('message')}")
+                # 这里可以添加上传PDF到其他服务的代码
+            else:
+                print(f"结果: {result.get('content', '')}")
         except Exception as e:
             print(f"❌ 测试失败: {e}")
         print("-" * 30)
