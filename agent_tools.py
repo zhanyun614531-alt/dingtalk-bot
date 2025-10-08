@@ -1258,537 +1258,539 @@ AI：```json
 ```
 """
 
-        def get_weather(self, city):
-            """获取天气信息"""
-            if not city:
-                return "请指定城市名称"
+    def get_weather(self, city):
+        """获取天气信息"""
+        if not city:
+            return "请指定城市名称"
 
-            try:
-                response = requests.get(f"https://wttr.in/{city}?format=j1", timeout=10)
-                weather_data = response.json()
-                current = weather_data["current_condition"][0]
-                return (f"{city}天气：{current['weatherDesc'][0]['value']}，"
-                        f"温度{current['temp_C']}°C，湿度{current['humidity']}%")
-            except:
-                return "天气查询失败"
+        try:
+            response = requests.get(f"https://wttr.in/{city}?format=j1", timeout=10)
+            weather_data = response.json()
+            current = weather_data["current_condition"][0]
+            return (f"{city}天气：{current['weatherDesc'][0]['value']}，"
+                    f"温度{current['temp_C']}°C，湿度{current['humidity']}%")
+        except:
+            return "天气查询失败"
 
-        def calculator(self, expression):
-            """执行数学计算"""
-            if not expression:
-                return "请提供数学表达式"
+    def calculator(self, expression):
+        """执行数学计算"""
+        if not expression:
+            return "请提供数学表达式"
 
-            try:
-                allowed_chars = {'+', '-', '*', '/', '(', ')', '.', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8',
-                                 '9'}
-                if not all(c in allowed_chars for c in expression):
-                    return "表达式包含不支持的字符"
-                result = eval(expression)
-                return f"{expression} = {result}"
-            except:
-                return "计算失败"
+        try:
+            allowed_chars = {'+', '-', '*', '/', '(', ')', '.', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8',
+                             '9'}
+            if not all(c in allowed_chars for c in expression):
+                return "表达式包含不支持的字符"
+            result = eval(expression)
+            return f"{expression} = {result}"
+        except:
+            return "计算失败"
 
-        def send_email(self, to, subject, body):
-            """发送邮件 - 使用 Brevo API"""
-            if not all([to, subject, body]):
-                return "收件人、主题或正文不能为空"
+    def send_email(self, to, subject, body):
+        """发送邮件 - 使用 Brevo API"""
+        if not all([to, subject, body]):
+            return "收件人、主题或正文不能为空"
 
-            brevo_api_key = os.environ.get("BREVO_API_KEY")
-            sender_email = os.environ.get("BREVO_SENDER_EMAIL")
-            sender_name = os.environ.get("BREVO_SENDER_NAME", "智能助手")
+        brevo_api_key = os.environ.get("BREVO_API_KEY")
+        sender_email = os.environ.get("BREVO_SENDER_EMAIL")
+        sender_name = os.environ.get("BREVO_SENDER_NAME", "智能助手")
 
-            if not brevo_api_key:
-                return "邮件服务未配置"
+        if not brevo_api_key:
+            return "邮件服务未配置"
 
-            try:
-                url = "https://api.brevo.com/v3/smtp/email"
+        try:
+            url = "https://api.brevo.com/v3/smtp/email"
 
-                payload = {
-                    "sender": {
-                        "name": sender_name,
-                        "email": sender_email
-                    },
-                    "to": [{"email": to}],
-                    "subject": subject,
-                    "htmlContent": f"""
-                    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                        <h2>{subject}</h2>
-                        <div style="white-space: pre-line; padding: 20px; background: #f9f9f9; border-radius: 5px;">
-                            {body}
-                        </div>
-                        <p style="color: #999; font-size: 12px; margin-top: 20px;">
-                            此邮件由智能助手自动发送
-                        </p>
+            payload = {
+                "sender": {
+                    "name": sender_name,
+                    "email": sender_email
+                },
+                "to": [{"email": to}],
+                "subject": subject,
+                "htmlContent": f"""
+                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                    <h2>{subject}</h2>
+                    <div style="white-space: pre-line; padding: 20px; background: #f9f9f9; border-radius: 5px;">
+                        {body}
                     </div>
-                    """,
-                    "textContent": body
-                }
+                    <p style="color: #999; font-size: 12px; margin-top: 20px;">
+                        此邮件由智能助手自动发送
+                    </p>
+                </div>
+                """,
+                "textContent": body
+            }
 
-                headers = {
-                    "accept": "application/json",
-                    "content-type": "application/json",
-                    "api-key": brevo_api_key
-                }
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+                "api-key": brevo_api_key
+            }
 
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
 
-                if response.status_code == 201:
-                    return f"📧 邮件发送成功！已发送至：{to}"
-                else:
-                    error_data = response.json()
-                    return f"❌ 邮件发送失败：{error_data.get('message', 'Unknown error')}"
+            if response.status_code == 201:
+                return f"📧 邮件发送成功！已发送至：{to}"
+            else:
+                error_data = response.json()
+                return f"❌ 邮件发送失败：{error_data.get('message', 'Unknown error')}"
 
-            except Exception as e:
-                return f"❌ 邮件发送异常：{str(e)}"
+        except Exception as e:
+            return f"❌ 邮件发送异常：{str(e)}"
 
-        # ========== 股票分析功能 ==========
+    # ========== 股票分析功能 ==========
 
-        async def generate_stock_report(self, stock_name):
-            """
-            生成股票分析报告（异步版本）
+    async def generate_stock_report(self, stock_name):
+        """
+        生成股票分析报告（异步版本）
 
-            参数:
-            - stock_name: 股票名称或代码
+        参数:
+        - stock_name: 股票名称或代码
 
-            返回:
-            - PDF二进制数据，如果失败则返回None
-            """
-            print(f"📈 开始生成股票分析报告: {stock_name}")
+        返回:
+        - PDF二进制数据，如果失败则返回None
+        """
+        print(f"📈 开始生成股票分析报告: {stock_name}")
 
-            try:
-                pdf_binary = await self.stock_agent.generate_stock_report(stock_name)
-                if pdf_binary:
-                    print(f"✅ 股票分析报告生成成功，大小: {len(pdf_binary)} 字节")
-                    # 返回PDF二进制数据，用于后续上传或其他操作
-                    return pdf_binary
-                else:
-                    print("❌ 股票分析报告生成失败")
-                    return None
-
-            except Exception as e:
-                print(f"❌ 生成股票分析报告时出错: {e}")
+        try:
+            pdf_binary = await self.stock_agent.generate_stock_report(stock_name)
+            if pdf_binary:
+                print(f"✅ 股票分析报告生成成功，大小: {len(pdf_binary)} 字节")
+                # 返回PDF二进制数据，用于后续上传或其他操作
+                return pdf_binary
+            else:
+                print("❌ 股票分析报告生成失败")
                 return None
 
-        # ========== Google日历和任务相关方法 ==========
-
-        def create_task(self, title, notes="", due_date=None, reminder_minutes=60, priority="medium"):
-            """创建Google任务"""
-            try:
-                print(f"📝 开始创建任务: {title}")
-
-                # 解析时间字符串
-                due_dt = None
-                if due_date:
-                    print(f"⏰ 解析截止时间: {due_date}")
-                    due_dt = datetime.strptime(due_date, "%Y-%m-%d %H:%M")
-                    print(f"✅ 时间解析成功: {due_dt}")
-
-                result = self.calendar_manager.create_task(
-                    title=title,
-                    notes=notes,
-                    due_date=due_dt,
-                    reminder_minutes=reminder_minutes,
-                    priority=priority
-                )
-
-                if result.get("success"):
-                    print(f"✅ 任务创建成功: {title}")
-                    return result.get("message", f"✅ 任务 '{title}' 创建成功")
-                else:
-                    error_msg = result.get("error", "创建任务失败")
-                    print(f"❌ 任务创建失败: {error_msg}")
-                    return f"❌ {error_msg}"
-
-            except Exception as e:
-                error_msg = f"❌ 创建任务时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
-
-        def query_tasks(self, show_completed=False, max_results=20):
-            """查询任务"""
-            try:
-                print(f"🔍 查询任务: show_completed={show_completed}")
-
-                result = self.calendar_manager.query_tasks(
-                    show_completed=show_completed,
-                    max_results=max_results
-                )
-
-                if not result["success"]:
-                    error_msg = result.get("error", "查询任务失败")
-                    print(f"❌ 查询失败: {error_msg}")
-                    return f"❌ {error_msg}"
-
-                if not result["tasks"]:
-                    print("📭 没有找到任务")
-                    return result["message"]
-
-                # 格式化输出任务列表
-                status_text = "所有" if show_completed else "待办"
-                tasks_text = f"📋 {status_text}任务列表 ({result['count']}个):\n\n"
-
-                for i, task in enumerate(result["tasks"], 1):
-                    status_emoji = "✅" if task['status'] == "completed" else "⏳"
-                    priority_emoji = {"low": "⚪", "medium": "🟡", "high": "🔴"}.get(task['priority'], '🟡')
-
-                    tasks_text += f"{i}. {status_emoji}{priority_emoji} {task['title']}\n"
-                    tasks_text += f"   截止: {task['due']}\n"
-                    if task['notes']:
-                        tasks_text += f"   描述: {task['notes'][:50]}...\n"
-                    tasks_text += f"   状态: {task['status']} | 优先级: {task['priority']}\n"
-                    tasks_text += f"   ID: {task['id'][:8]}...\n\n"
-
-                print(f"✅ 找到 {len(result['tasks'])} 个任务")
-                return tasks_text
-
-            except Exception as e:
-                error_msg = f"❌ 查询任务时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
-
-        def update_task_status(self, task_id, status="completed"):
-            """更新任务状态"""
-            try:
-                result = self.calendar_manager.update_task_status(task_id, status)
-                return result.get("message", result.get("error", "状态更新完成"))
-            except Exception as e:
-                return f"❌ 更新任务状态时出错: {str(e)}"
-
-        def delete_task(self, task_id):
-            """删除任务（通过任务ID）"""
-            try:
-                result = self.calendar_manager.delete_task(task_id)
-                return result.get("message", result.get("error", "删除完成"))
-            except Exception as e:
-                return f"❌ 删除任务时出错: {str(e)}"
-
-        def delete_task_by_title(self, title_keyword):
-            """根据标题删除任务"""
-            try:
-                result = self.calendar_manager.delete_task_by_title(title_keyword)
-                return result.get("message", result.get("error", "删除完成"))
-            except Exception as e:
-                return f"❌ 按标题删除任务时出错: {str(e)}"
-
-        def delete_tasks_by_time_range(self, start_date=None, end_date=None, show_completed=True):
-            """按时间范围批量删除任务"""
-            try:
-                print(f"🗑️ 按时间范围删除任务: {start_date} 到 {end_date}")
-
-                result = self.calendar_manager.delete_tasks_by_time_range(
-                    start_date=start_date,
-                    end_date=end_date,
-                    show_completed=show_completed
-                )
-
-                if result.get("success"):
-                    print(f"✅ 时间范围删除任务成功")
-                    return result.get("message", "✅ 时间范围删除任务完成")
-                else:
-                    error_msg = result.get("error", "时间范围删除任务失败")
-                    print(f"❌ 时间范围删除任务失败: {error_msg}")
-                    return f"❌ {error_msg}"
-
-            except Exception as e:
-                error_msg = f"❌ 按时间范围删除任务时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
-
-        def create_event(self, summary, description="", start_time=None, end_time=None,
-                         reminder_minutes=30, priority="medium"):
-            """创建Google日历事件"""
-            try:
-                print(f"📅 开始创建日历事件: {summary}")
-
-                # 解析时间字符串
-                start_dt = None
-                end_dt = None
-
-                if start_time:
-                    start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
-                if end_time:
-                    end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M")
-
-                result = self.calendar_manager.create_event(
-                    summary=summary,
-                    description=description,
-                    start_time=start_dt,
-                    end_time=end_dt,
-                    reminder_minutes=reminder_minutes,
-                    priority=priority
-                )
-
-                if result.get("success"):
-                    print(f"✅ 日历事件创建成功: {summary}")
-                    return result.get("message", f"✅ 日历事件 '{summary}' 创建成功")
-                else:
-                    error_msg = result.get("error", "创建日历事件失败")
-                    print(f"❌ 日历事件创建失败: {error_msg}")
-                    return f"❌ {error_msg}"
-
-            except Exception as e:
-                error_msg = f"❌ 创建日历事件时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
-
-        def query_events(self, days=30, max_results=20):
-            """查询日历事件"""
-            try:
-                result = self.calendar_manager.query_events(days=days, max_results=max_results)
-
-                if not result["success"]:
-                    return result["error"]
-
-                if not result["events"]:
-                    return result["message"]
-
-                return result["message"]
-
-            except Exception as e:
-                return f"❌ 查询日历事件时出错: {str(e)}"
-
-        def update_event_status(self, event_id, status="completed"):
-            """更新事件状态"""
-            try:
-                result = self.calendar_manager.update_event_status(event_id, status)
-                return result.get("message", result.get("error", "状态更新完成"))
-            except Exception as e:
-                return f"❌ 更新事件状态时出错: {str(e)}"
-
-        def delete_event(self, event_id):
-            """删除日历事件"""
-            try:
-                result = self.calendar_manager.delete_event(event_id)
-                return result.get("message", result.get("error", "删除完成"))
-            except Exception as e:
-                return f"❌ 删除日历事件时出错: {str(e)}"
-
-        def delete_event_by_summary(self, summary, days=30):
-            """根据标题删除日历事件"""
-            try:
-                result = self.calendar_manager.delete_event_by_summary(summary, days)
-                return result.get("message", result.get("error", "删除完成"))
-            except Exception as e:
-                return f"❌ 按标题删除事件时出错: {str(e)}"
-
-        def delete_events_by_time_range(self, start_date=None, end_date=None):
-            """按时间范围批量删除日历事件"""
-            try:
-                print(f"🗑️ 按时间范围删除日历事件: {start_date} 到 {end_date}")
-
-                result = self.calendar_manager.delete_events_by_time_range(
-                    start_date=start_date,
-                    end_date=end_date
-                )
-
-                if result.get("success"):
-                    print(f"✅ 时间范围删除日历事件成功")
-                    return result.get("message", "✅ 时间范围删除日历事件完成")
-                else:
-                    error_msg = result.get("error", "时间范围删除日历事件失败")
-                    print(f"❌ 时间范围删除日历事件失败: {error_msg}")
-                    return f"❌ {error_msg}"
-
-            except Exception as e:
-                error_msg = f"❌ 按时间范围删除日历事件时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
-
-        def extract_tool_call(self, llm_response):
-            """从LLM响应中提取工具调用指令"""
-            print(f"🔍 解析LLM响应: {llm_response}")
-
-            if "```json" in llm_response and "```" in llm_response:
-                try:
-                    start = llm_response.find("```json") + 7
-                    end = llm_response.find("```", start)
-                    json_str = llm_response[start:end].strip()
-                    print(f"📦 提取到JSON代码块: {json_str}")
-
-                    tool_data = json.loads(json_str)
-                    if isinstance(tool_data, dict) and "action" in tool_data and "parameters" in tool_data:
-                        print(f"✅ 成功解析工具调用: {tool_data['action']}")
-                        return tool_data
-                except json.JSONDecodeError as e:
-                    print(f"❌ JSON解析失败: {e}")
-                    return None
-                except Exception as e:
-                    print(f"❌ 提取工具调用失败: {e}")
-                    return None
-
-            print("❌ 未找到有效的工具调用")
+        except Exception as e:
+            print(f"❌ 生成股票分析报告时出错: {e}")
             return None
 
-        async def call_tool(self, action, parameters):
-            """统一工具调用入口 - 异步版本"""
-            print(f"🛠️ 调用工具: {action}")
-            print(f"📋 工具参数: {parameters}")
+    # ========== Google日历和任务相关方法 ==========
 
+    def create_task(self, title, notes="", due_date=None, reminder_minutes=60, priority="medium"):
+        """创建Google任务"""
+        try:
+            print(f"📝 开始创建任务: {title}")
+
+            # 解析时间字符串
+            due_dt = None
+            if due_date:
+                print(f"⏰ 解析截止时间: {due_date}")
+                due_dt = datetime.strptime(due_date, "%Y-%m-%d %H:%M")
+                print(f"✅ 时间解析成功: {due_dt}")
+
+            result = self.calendar_manager.create_task(
+                title=title,
+                notes=notes,
+                due_date=due_dt,
+                reminder_minutes=reminder_minutes,
+                priority=priority
+            )
+
+            if result.get("success"):
+                print(f"✅ 任务创建成功: {title}")
+                return result.get("message", f"✅ 任务 '{title}' 创建成功")
+            else:
+                error_msg = result.get("error", "创建任务失败")
+                print(f"❌ 任务创建失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 创建任务时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    def query_tasks(self, show_completed=False, max_results=20):
+        """查询任务"""
+        try:
+            print(f"🔍 查询任务: show_completed={show_completed}")
+
+            result = self.calendar_manager.query_tasks(
+                show_completed=show_completed,
+                max_results=max_results
+            )
+
+            if not result["success"]:
+                error_msg = result.get("error", "查询任务失败")
+                print(f"❌ 查询失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+            if not result["tasks"]:
+                print("📭 没有找到任务")
+                return result["message"]
+
+            # 格式化输出任务列表
+            status_text = "所有" if show_completed else "待办"
+            tasks_text = f"📋 {status_text}任务列表 ({result['count']}个):\n\n"
+
+            for i, task in enumerate(result["tasks"], 1):
+                status_emoji = "✅" if task['status'] == "completed" else "⏳"
+                priority_emoji = {"low": "⚪", "medium": "🟡", "high": "🔴"}.get(task['priority'], '🟡')
+
+                tasks_text += f"{i}. {status_emoji}{priority_emoji} {task['title']}\n"
+                tasks_text += f"   截止: {task['due']}\n"
+                if task['notes']:
+                    tasks_text += f"   描述: {task['notes'][:50]}...\n"
+                tasks_text += f"   状态: {task['status']} | 优先级: {task['priority']}\n"
+                tasks_text += f"   ID: {task['id'][:8]}...\n\n"
+
+            print(f"✅ 找到 {len(result['tasks'])} 个任务")
+            return tasks_text
+
+        except Exception as e:
+            error_msg = f"❌ 查询任务时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    def update_task_status(self, task_id, status="completed"):
+        """更新任务状态"""
+        try:
+            result = self.calendar_manager.update_task_status(task_id, status)
+            return result.get("message", result.get("error", "状态更新完成"))
+        except Exception as e:
+            return f"❌ 更新任务状态时出错: {str(e)}"
+
+    def delete_task(self, task_id):
+        """删除任务（通过任务ID）"""
+        try:
+            result = self.calendar_manager.delete_task(task_id)
+            return result.get("message", result.get("error", "删除完成"))
+        except Exception as e:
+            return f"❌ 删除任务时出错: {str(e)}"
+
+    def delete_task_by_title(self, title_keyword):
+        """根据标题删除任务"""
+        try:
+            result = self.calendar_manager.delete_task_by_title(title_keyword)
+            return result.get("message", result.get("error", "删除完成"))
+        except Exception as e:
+            return f"❌ 按标题删除任务时出错: {str(e)}"
+
+    def delete_tasks_by_time_range(self, start_date=None, end_date=None, show_completed=True):
+        """按时间范围批量删除任务"""
+        try:
+            print(f"🗑️ 按时间范围删除任务: {start_date} 到 {end_date}")
+
+            result = self.calendar_manager.delete_tasks_by_time_range(
+                start_date=start_date,
+                end_date=end_date,
+                show_completed=show_completed
+            )
+
+            if result.get("success"):
+                print(f"✅ 时间范围删除任务成功")
+                return result.get("message", "✅ 时间范围删除任务完成")
+            else:
+                error_msg = result.get("error", "时间范围删除任务失败")
+                print(f"❌ 时间范围删除任务失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 按时间范围删除任务时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    def create_event(self, summary, description="", start_time=None, end_time=None,
+                     reminder_minutes=30, priority="medium"):
+        """创建Google日历事件"""
+        try:
+            print(f"📅 开始创建日历事件: {summary}")
+
+            # 解析时间字符串
+            start_dt = None
+            end_dt = None
+
+            if start_time:
+                start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
+            if end_time:
+                end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M")
+
+            result = self.calendar_manager.create_event(
+                summary=summary,
+                description=description,
+                start_time=start_dt,
+                end_time=end_dt,
+                reminder_minutes=reminder_minutes,
+                priority=priority
+            )
+
+            if result.get("success"):
+                print(f"✅ 日历事件创建成功: {summary}")
+                return result.get("message", f"✅ 日历事件 '{summary}' 创建成功")
+            else:
+                error_msg = result.get("error", "创建日历事件失败")
+                print(f"❌ 日历事件创建失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 创建日历事件时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    def query_events(self, days=30, max_results=20):
+        """查询日历事件"""
+        try:
+            result = self.calendar_manager.query_events(days=days, max_results=max_results)
+
+            if not result["success"]:
+                return result["error"]
+
+            if not result["events"]:
+                return result["message"]
+
+            return result["message"]
+
+        except Exception as e:
+            return f"❌ 查询日历事件时出错: {str(e)}"
+
+    def update_event_status(self, event_id, status="completed"):
+        """更新事件状态"""
+        try:
+            result = self.calendar_manager.update_event_status(event_id, status)
+            return result.get("message", result.get("error", "状态更新完成"))
+        except Exception as e:
+            return f"❌ 更新事件状态时出错: {str(e)}"
+
+    def delete_event(self, event_id):
+        """删除日历事件"""
+        try:
+            result = self.calendar_manager.delete_event(event_id)
+            return result.get("message", result.get("error", "删除完成"))
+        except Exception as e:
+            return f"❌ 删除日历事件时出错: {str(e)}"
+
+    def delete_event_by_summary(self, summary, days=30):
+        """根据标题删除日历事件"""
+        try:
+            result = self.calendar_manager.delete_event_by_summary(summary, days)
+            return result.get("message", result.get("error", "删除完成"))
+        except Exception as e:
+            return f"❌ 按标题删除事件时出错: {str(e)}"
+
+    def delete_events_by_time_range(self, start_date=None, end_date=None):
+        """按时间范围批量删除日历事件"""
+        try:
+            print(f"🗑️ 按时间范围删除日历事件: {start_date} 到 {end_date}")
+
+            result = self.calendar_manager.delete_events_by_time_range(
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if result.get("success"):
+                print(f"✅ 时间范围删除日历事件成功")
+                return result.get("message", "✅ 时间范围删除日历事件完成")
+            else:
+                error_msg = result.get("error", "时间范围删除日历事件失败")
+                print(f"❌ 时间范围删除日历事件失败: {error_msg}")
+                return f"❌ {error_msg}"
+
+        except Exception as e:
+            error_msg = f"❌ 按时间范围删除日历事件时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    def extract_tool_call(self, llm_response):
+        """从LLM响应中提取工具调用指令"""
+        print(f"🔍 解析LLM响应: {llm_response}")
+
+        if "```json" in llm_response and "```" in llm_response:
             try:
-                if action == "create_task":
-                    return self.create_task(
-                        title=parameters.get("title", ""),
-                        notes=parameters.get("notes", ""),
-                        due_date=parameters.get("due_date"),
-                        reminder_minutes=parameters.get("reminder_minutes", 60),
-                        priority=parameters.get("priority", "medium")
-                    )
-                elif action == "query_tasks":
-                    return self.query_tasks(
-                        show_completed=parameters.get("show_completed", False),
-                        max_results=parameters.get("max_results", 20)
-                    )
-                elif action == "update_task_status":
-                    return self.update_task_status(
-                        task_id=parameters.get("task_id", ""),
-                        status=parameters.get("status", "completed")
-                    )
-                elif action == "delete_task":
-                    return self.delete_task(
-                        task_id=parameters.get("task_id", "")
-                    )
-                elif action == "delete_task_by_title":
-                    return self.delete_task_by_title(
-                        title_keyword=parameters.get("title_keyword", "")
-                    )
-                elif action == "delete_tasks_by_time_range":
-                    return self.delete_tasks_by_time_range(
-                        start_date=parameters.get("start_date"),
-                        end_date=parameters.get("end_date"),
-                        show_completed=parameters.get("show_completed", True)
-                    )
-                elif action == "create_event":
-                    return self.create_event(
-                        summary=parameters.get("summary", ""),
-                        description=parameters.get("description", ""),
-                        start_time=parameters.get("start_time"),
-                        end_time=parameters.get("end_time"),
-                        reminder_minutes=parameters.get("reminder_minutes", 30),
-                        priority=parameters.get("priority", "medium")
-                    )
-                elif action == "query_events":
-                    return self.query_events(
-                        days=parameters.get("days", 30),
-                        max_results=parameters.get("max_results", 20)
-                    )
-                elif action == "update_event_status":
-                    return self.update_event_status(
-                        event_id=parameters.get("event_id", ""),
-                        status=parameters.get("status", "completed")
-                    )
-                elif action == "delete_event":
-                    return self.delete_event(
-                        event_id=parameters.get("event_id", "")
-                    )
-                elif action == "delete_event_by_summary":
-                    return self.delete_event_by_summary(
-                        summary=parameters.get("summary", ""),
-                        days=parameters.get("days", 30)
-                    )
-                elif action == "delete_events_by_time_range":
-                    return self.delete_events_by_time_range(
-                        start_date=parameters.get("start_date"),
-                        end_date=parameters.get("end_date")
-                    )
-                elif action == "generate_stock_report":
-                    # 股票分析工具返回PDF二进制数据
-                    pdf_binary = await self.generate_stock_report(parameters.get("stock_name", ""))
-                    if pdf_binary:
-                        return {
-                            "success": True,
-                            "pdf_binary": pdf_binary,
-                            "message": f"✅ 股票分析报告生成成功，PDF大小: {len(pdf_binary)} 字节",
-                            "stock_name": parameters.get("stock_name", "")
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": "❌ 股票分析报告生成失败"
-                        }
-                elif action == "get_weather":
-                    return self.get_weather(parameters.get("city", ""))
-                elif action == "calculator":
-                    return self.calculator(parameters.get("expression", ""))
-                elif action == "send_email":
-                    return self.send_email(
-                        parameters.get("to", ""),
-                        parameters.get("subject", ""),
-                        parameters.get("body", "")
-                    )
-                else:
-                    result = f"未知工具：{action}"
+                start = llm_response.find("```json") + 7
+                end = llm_response.find("```", start)
+                json_str = llm_response[start:end].strip()
+                print(f"📦 提取到JSON代码块: {json_str}")
 
-                print(f"✅ 工具执行结果: {result}")
-                return result
-
+                tool_data = json.loads(json_str)
+                if isinstance(tool_data, dict) and "action" in tool_data and "parameters" in tool_data:
+                    print(f"✅ 成功解析工具调用: {tool_data['action']}")
+                    return tool_data
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON解析失败: {e}")
+                return None
             except Exception as e:
-                error_msg = f"❌ 执行工具 {action} 时出错: {str(e)}"
-                print(error_msg)
-                return error_msg
+                print(f"❌ 提取工具调用失败: {e}")
+                return None
 
-        async def process_request(self, user_input):
-            """处理用户请求（异步版本）"""
-            print(f"👤 用户输入: {user_input}")
+        print("❌ 未找到有效的工具调用")
+        return None
 
-            messages = [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_input}
-            ]
+    async def call_tool(self, action, parameters):
+        """统一工具调用入口 - 异步版本"""
+        print(f"🛠️ 调用工具: {action}")
+        print(f"📋 工具参数: {parameters}")
 
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model_id,
-                    messages=messages,
-                    stream=False
+        try:
+            if action == "create_task":
+                return self.create_task(
+                    title=parameters.get("title", ""),
+                    notes=parameters.get("notes", ""),
+                    due_date=parameters.get("due_date"),
+                    reminder_minutes=parameters.get("reminder_minutes", 60),
+                    priority=parameters.get("priority", "medium")
                 )
-
-                llm_response = response.choices[0].message.content.strip()
-                print(f"🤖 LLM原始响应: {llm_response}")
-
-                # 检查工具调用
-                tool_data = self.extract_tool_call(llm_response)
-                if tool_data:
-                    print(f"🔧 检测到工具调用: {tool_data['action']}")
-                    tool_result = await self.call_tool(tool_data["action"], tool_data["parameters"])
-
-                    # 特殊处理股票分析工具，返回PDF二进制数据
-                    if tool_data["action"] == "generate_stock_report" and isinstance(tool_result,
-                                                                                     dict) and tool_result.get(
-                        "success"):
-                        return {
-                            "type": "stock_pdf",
-                            "success": True,
-                            "pdf_binary": tool_result.get("pdf_binary"),
-                            "message": tool_result.get("message"),
-                            "stock_name": tool_result.get("stock_name")
-                        }
-                    else:
-                        return {
-                            "type": "text",
-                            "content": tool_result,
-                            "success": True
-                        }
+            elif action == "query_tasks":
+                return self.query_tasks(
+                    show_completed=parameters.get("show_completed", False),
+                    max_results=parameters.get("max_results", 20)
+                )
+            elif action == "update_task_status":
+                return self.update_task_status(
+                    task_id=parameters.get("task_id", ""),
+                    status=parameters.get("status", "completed")
+                )
+            elif action == "delete_task":
+                return self.delete_task(
+                    task_id=parameters.get("task_id", "")
+                )
+            elif action == "delete_task_by_title":
+                return self.delete_task_by_title(
+                    title_keyword=parameters.get("title_keyword", "")
+                )
+            elif action == "delete_tasks_by_time_range":
+                return self.delete_tasks_by_time_range(
+                    start_date=parameters.get("start_date"),
+                    end_date=parameters.get("end_date"),
+                    show_completed=parameters.get("show_completed", True)
+                )
+            elif action == "create_event":
+                return self.create_event(
+                    summary=parameters.get("summary", ""),
+                    description=parameters.get("description", ""),
+                    start_time=parameters.get("start_time"),
+                    end_time=parameters.get("end_time"),
+                    reminder_minutes=parameters.get("reminder_minutes", 30),
+                    priority=parameters.get("priority", "medium")
+                )
+            elif action == "query_events":
+                return self.query_events(
+                    days=parameters.get("days", 30),
+                    max_results=parameters.get("max_results", 20)
+                )
+            elif action == "update_event_status":
+                return self.update_event_status(
+                    event_id=parameters.get("event_id", ""),
+                    status=parameters.get("status", "completed")
+                )
+            elif action == "delete_event":
+                return self.delete_event(
+                    event_id=parameters.get("event_id", "")
+                )
+            elif action == "delete_event_by_summary":
+                return self.delete_event_by_summary(
+                    summary=parameters.get("summary", ""),
+                    days=parameters.get("days", 30)
+                )
+            elif action == "delete_events_by_time_range":
+                return self.delete_events_by_time_range(
+                    start_date=parameters.get("start_date"),
+                    end_date=parameters.get("end_date")
+                )
+            elif action == "generate_stock_report":
+                # 股票分析工具返回PDF二进制数据
+                pdf_binary = await self.generate_stock_report(parameters.get("stock_name", ""))
+                if pdf_binary:
+                    return {
+                        "success": True,
+                        "pdf_binary": pdf_binary,
+                        "message": f"✅ 股票分析报告生成成功，PDF大小: {len(pdf_binary)} 字节",
+                        "stock_name": parameters.get("stock_name", "")
+                    }
                 else:
-                    print("💬 无工具调用，直接返回LLM响应")
+                    return {
+                        "success": False,
+                        "error": "❌ 股票分析报告生成失败"
+                    }
+            elif action == "get_weather":
+                return self.get_weather(parameters.get("city", ""))
+            elif action == "calculator":
+                return self.calculator(parameters.get("expression", ""))
+            elif action == "send_email":
+                return self.send_email(
+                    parameters.get("to", ""),
+                    parameters.get("subject", ""),
+                    parameters.get("body", "")
+                )
+            else:
+                result = f"未知工具：{action}"
+
+            print(f"✅ 工具执行结果: {result}")
+            return result
+
+        except Exception as e:
+            error_msg = f"❌ 执行工具 {action} 时出错: {str(e)}"
+            print(error_msg)
+            return error_msg
+
+    async def process_request(self, user_input):
+        """处理用户请求（异步版本）"""
+        print(f"👤 用户输入: {user_input}")
+
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_input}
+        ]
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_id,
+                messages=messages,
+                stream=False
+            )
+
+            llm_response = response.choices[0].message.content.strip()
+            print(f"🤖 LLM原始响应: {llm_response}")
+
+            # 检查工具调用
+            tool_data = self.extract_tool_call(llm_response)
+            if tool_data:
+                print(f"🔧 检测到工具调用: {tool_data['action']}")
+                tool_result = await self.call_tool(tool_data["action"], tool_data["parameters"])
+
+                # 特殊处理股票分析工具，返回PDF二进制数据
+                if tool_data["action"] == "generate_stock_report" and isinstance(tool_result,
+                                                                                 dict) and tool_result.get(
+                    "success"):
+                    return {
+                        "type": "stock_pdf",
+                        "success": True,
+                        "pdf_binary": tool_result.get("pdf_binary"),
+                        "message": tool_result.get("message"),
+                        "stock_name": tool_result.get("stock_name")
+                    }
+                else:
                     return {
                         "type": "text",
-                        "content": llm_response,
+                        "content": str(tool_result),  # 确保返回字符串
                         "success": True
                     }
-
-            except Exception as e:
-                error_msg = f"处理请求时出错：{str(e)}"
-                print(f"❌ {error_msg}")
+            else:
+                print("💬 无工具调用，直接返回LLM响应")
                 return {
                     "type": "text",
-                    "content": error_msg,
-                    "success": False
+                    "content": llm_response,
+                    "success": True
                 }
+
+        except Exception as e:
+            error_msg = f"处理请求时出错：{str(e)}"
+            print(f"❌ {error_msg}")
+            return {
+                "type": "text",
+                "content": error_msg,
+                "success": False
+            }
+
 
 async def smart_assistant(user_input):
     """智能助手主函数 - 异步版本"""
     agent = DeepseekAgent()
     result = await agent.process_request(user_input)
     return result
+
 
 async def test_playwright_async():
     """异步测试Playwright功能"""
