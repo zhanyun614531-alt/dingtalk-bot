@@ -228,7 +228,7 @@ async def send_pdf_via_dingtalk(pdf_binary: bytes, stock_name: str, at_user_ids=
         return False
 
 
-def sync_llm_processing(conversation_id, user_input, at_user_ids):
+async def sync_llm_processing(conversation_id, user_input, at_user_ids):
     """同步处理LLM任务（在线程中运行）"""
     try:
         app_logger.info(f"开始处理LLM请求: {user_input}")
@@ -236,10 +236,10 @@ def sync_llm_processing(conversation_id, user_input, at_user_ids):
         ark_key = os.environ.get('ARK_API_KEY')
         if not ark_key:
             error_msg = "Test1：ARK_API_KEY未设置"
-            asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
+            await send_official_message(error_msg, at_user_ids=at_user_ids)
             return
 
-        result = agent_tools.smart_assistant(user_input)
+        result = await agent_tools.smart_assistant(user_input)
 
         if result:
             # 处理不同类型的返回结果
@@ -251,29 +251,29 @@ def sync_llm_processing(conversation_id, user_input, at_user_ids):
 
                 if pdf_binary:
                     # 先发送提示消息
-                    asyncio.run(send_official_message("📈 正在生成股票分析报告PDF，请稍候...", at_user_ids=at_user_ids))
+                    await send_official_message("📈 正在生成股票分析报告PDF，请稍候...", at_user_ids=at_user_ids)
                     # 发送PDF文件
-                    asyncio.run(send_pdf_via_dingtalk(pdf_binary, stock_name, at_user_ids))
+                    await send_pdf_via_dingtalk(pdf_binary, stock_name, at_user_ids)
                 else:
                     error_msg = "❌ PDF二进制数据为空"
-                    asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
+                    await send_official_message(error_msg, at_user_ids=at_user_ids)
 
             elif isinstance(result, dict) and result.get("type") == "text":
                 # 处理普通文本结果
                 final_result = f"Test1：{result.get('content', '')}"
-                asyncio.run(send_official_message(final_result, at_user_ids=at_user_ids))
+                await send_official_message(final_result, at_user_ids=at_user_ids)
             else:
                 # 兼容旧版本返回格式
                 final_result = f"Test1：{result}"
-                asyncio.run(send_official_message(final_result, at_user_ids=at_user_ids))
+                await send_official_message(final_result, at_user_ids=at_user_ids)
         else:
             error_msg = "Test1：LLM返回了空内容"
-            asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
+            await send_official_message(error_msg, at_user_ids=at_user_ids)
 
     except Exception as e:
         error_msg = f"Test1：处理出错: {str(e)}"
         app_logger.error(f"LLM处理错误: {error_msg}")
-        asyncio.run(send_official_message(error_msg, at_user_ids=at_user_ids))
+        await send_official_message(error_msg, at_user_ids=at_user_ids)
     finally:
         if conversation_id in processing_tasks:
             del processing_tasks[conversation_id]
@@ -290,8 +290,7 @@ async def async_process_llm_message(conversation_id, user_input, at_user_ids):
 
     await loop.run_in_executor(
         thread_pool,
-        sync_llm_processing,
-        conversation_id, user_input, at_user_ids
+        lambda: asyncio.run(sync_llm_processing(conversation_id, user_input, at_user_ids))
     )
 
 
@@ -355,7 +354,7 @@ def process_command(command):
     elif command.startswith("LLM"):
         try:
             pure_command = re.sub(r'^LLM', '', command).strip()
-            response = agent_tools.smart_assistant(pure_command)
+            response = asyncio.run(agent_tools.smart_assistant(pure_command))
 
             if response is None:
                 return "Test1：LLM处理超时或无响应"
@@ -480,21 +479,17 @@ async def api_send_pdf(request: Request):
         app_logger.error(f"API发送PDF出错: {str(e)}")
         raise HTTPException(status_code=500, detail=f"发送PDF出错: {str(e)}")
 
+
 @app.get("/test-playwright")
 async def test_playwright():
+    """测试Playwright异步功能"""
     try:
-        from playwright.sync_api import sync_playwright
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto('https://example.com')
-            title = page.title()
-            browser.close()
-            
-            return {"status": "success", "message": f"Playwright测试成功: {title}"}
+        # 使用异步方式测试Playwright
+        result = await agent_tools.test_playwright_async()
+        return {"status": "success", "message": f"Playwright测试成功: {result}"}
     except Exception as e:
         return {"status": "error", "message": f"Playwright测试失败: {str(e)}"}
+
 
 if __name__ == '__main__':
     import uvicorn
