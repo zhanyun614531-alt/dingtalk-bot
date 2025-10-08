@@ -348,31 +348,24 @@ HTML格式要求：
             return None
 
     async def generate_stock_report(self, stock_name_or_code):
-        """
-        生成股票分析报告的主方法（异步版本）
+    """生成股票分析报告的主方法（异步版本）"""
+    print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
 
-        参数:
-        - stock_name_or_code: 股票名称或代码
-
-        返回:
-        - PDF二进制数据，如果失败则返回None
-        """
-        print(f"🎯 开始生成 {stock_name_or_code} 的分析报告...")
-
-        # 获取HTML内容
-        html_content = self.get_html_from_doubao(stock_name_or_code)
-        if html_content:
-            # 转换为PDF二进制数据
-            pdf_binary = await self.html_to_pdf(html_content)
-            if pdf_binary:
-                print(f"✅ {stock_name_or_code} 分析报告生成成功！")
-                return pdf_binary
-            else:
-                print(f"❌ {stock_name_or_code} PDF转换失败")
-                return None
+    # 获取HTML内容
+    html_content = self.get_html_from_doubao(stock_name_or_code)
+    if html_content:
+        print(f"✅ 成功获取HTML内容，长度: {len(html_content)} 字符")
+        # 转换为PDF二进制数据
+        pdf_binary = await self.html_to_pdf(html_content)
+        if pdf_binary:
+            print(f"✅ {stock_name_or_code} 分析报告生成成功！PDF大小: {len(pdf_binary)} 字节")
+            return pdf_binary
         else:
-            print(f"❌ 无法获取 {stock_name_or_code} 的HTML内容")
+            print(f"❌ {stock_name_or_code} PDF转换失败")
             return None
+    else:
+        print(f"❌ 无法获取 {stock_name_or_code} 的HTML内容，可能是豆包API调用失败")
+        return None
 
 
 class GoogleCalendarManager:
