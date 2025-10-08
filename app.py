@@ -480,6 +480,21 @@ async def api_send_pdf(request: Request):
         app_logger.error(f"API发送PDF出错: {str(e)}")
         raise HTTPException(status_code=500, detail=f"发送PDF出错: {str(e)}")
 
+@app.get("/test-playwright")
+async def test_playwright():
+    try:
+        from playwright.sync_api import sync_playwright
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto('https://example.com')
+            title = page.title()
+            browser.close()
+            
+            return {"status": "success", "message": f"Playwright测试成功: {title}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Playwright测试失败: {str(e)}"}
 
 if __name__ == '__main__':
     import uvicorn
