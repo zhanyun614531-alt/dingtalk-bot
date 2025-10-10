@@ -77,67 +77,67 @@ def generate_dingtalk_signature(timestamp: str, secret: str) -> str:
     return urllib.parse.quote_plus(base64.b64encode(hmac_code))
 
 
-async def upload_file_to_dingtalk(file_data: bytes, file_name: str, file_type: str = "file") -> Dict[str, Any]:
-    """
-    上传文件到钉钉服务器并获取media_id
-
-    参数:
-    - file_data: 文件二进制数据
-    - file_name: 文件名
-    - file_type: 文件类型 (image, voice, file)
-
-    返回:
-    - 包含media_id的字典或错误信息
-    """
-    try:
-        timestamp = str(round(time.time() * 1000))
-        sign = generate_dingtalk_signature(timestamp, ROBOT_SECRET)
-
-        upload_url = f'https://oapi.dingtalk.com/robot/upload?access_token={ROBOT_ACCESS_TOKEN}&timestamp={timestamp}&sign={sign}'
-
-        # 准备文件上传
-        files = {
-            'media': (file_name, file_data, 'application/pdf')
-        }
-
-        data = {
-            'type': file_type
-        }
-
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: requests.post(upload_url, files=files, data=data, timeout=30)
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('errcode') == 0:
-                app_logger.info(f"✅ 文件上传成功: {file_name}, media_id: {result.get('media_id')}")
-                return {
-                    "success": True,
-                    "media_id": result.get('media_id'),
-                    "created_at": result.get('created_at')
-                }
-            else:
-                app_logger.error(f"❌ 文件上传失败: {result}")
-                return {
-                    "success": False,
-                    "error": f"上传失败: {result.get('errmsg', '未知错误')}"
-                }
-        else:
-            app_logger.error(f"❌ 文件上传HTTP错误: {response.status_code}")
-            return {
-                "success": False,
-                "error": f"HTTP错误: {response.status_code}"
-            }
-
-    except Exception as e:
-        app_logger.error(f"❌ 文件上传异常: {str(e)}")
-        return {
-            "success": False,
-            "error": f"上传异常: {str(e)}"
-        }
+# async def upload_file_to_dingtalk(file_data: bytes, file_name: str, file_type: str = "file") -> Dict[str, Any]:
+#     """
+#     上传文件到钉钉服务器并获取media_id
+#
+#     参数:
+#     - file_data: 文件二进制数据
+#     - file_name: 文件名
+#     - file_type: 文件类型 (image, voice, file)
+#
+#     返回:
+#     - 包含media_id的字典或错误信息
+#     """
+#     try:
+#         timestamp = str(round(time.time() * 1000))
+#         sign = generate_dingtalk_signature(timestamp, ROBOT_SECRET)
+#
+#         upload_url = f'https://oapi.dingtalk.com/robot/upload?access_token={ROBOT_ACCESS_TOKEN}&timestamp={timestamp}&sign={sign}'
+#
+#         # 准备文件上传
+#         files = {
+#             'media': (file_name, file_data, 'application/pdf')
+#         }
+#
+#         data = {
+#             'type': file_type
+#         }
+#
+#         loop = asyncio.get_event_loop()
+#         response = await loop.run_in_executor(
+#             None,
+#             lambda: requests.post(upload_url, files=files, data=data, timeout=30)
+#         )
+#
+#         if response.status_code == 200:
+#             result = response.json()
+#             if result.get('errcode') == 0:
+#                 app_logger.info(f"✅ 文件上传成功: {file_name}, media_id: {result.get('media_id')}")
+#                 return {
+#                     "success": True,
+#                     "media_id": result.get('media_id'),
+#                     "created_at": result.get('created_at')
+#                 }
+#             else:
+#                 app_logger.error(f"❌ 文件上传失败: {result}")
+#                 return {
+#                     "success": False,
+#                     "error": f"上传失败: {result.get('errmsg', '未知错误')}"
+#                 }
+#         else:
+#             app_logger.error(f"❌ 文件上传HTTP错误: {response.status_code}")
+#             return {
+#                 "success": False,
+#                 "error": f"HTTP错误: {response.status_code}"
+#             }
+#
+#     except Exception as e:
+#         app_logger.error(f"❌ 文件上传异常: {str(e)}")
+#         return {
+#             "success": False,
+#             "error": f"上传异常: {str(e)}"
+#         }
 
 
 async def send_file_message(media_id: str, file_name: str, at_user_ids=None, at_mobiles=None, is_at_all=False):
@@ -228,7 +228,7 @@ async def send_file_message(media_id: str, file_name: str, at_user_ids=None, at_
 #         await send_official_message(error_msg, at_user_ids=at_user_ids)
 #         return False
 
-async def upload_file(pdf_binary: bytes, stock_name: str, at_user_ids=None):
+async def upload_file_to_Qiniu(pdf_binary: bytes, stock_name: str, at_user_ids=None):
     """
     上传PDF二进制数据到七牛云
     :param pdf_binary_data: PDF文件的二进制数据
@@ -303,7 +303,7 @@ async def sync_llm_processing(conversation_id, user_input, at_user_ids):
                     await send_official_message("📈 正在生成股票分析报告PDF，请稍候...", at_user_ids=at_user_ids)
                     # 发送PDF文件
                     # await send_pdf_via_dingtalk(pdf_binary, stock_name, at_user_ids)
-                    await upload_file(pdf_binary, stock_name, at_user_ids)
+                    await upload_file_to_Qiniu(pdf_binary, stock_name, at_user_ids)
                 else:
                     error_msg = "❌ PDF二进制数据为空"
                     await send_official_message(error_msg, at_user_ids=at_user_ids)
