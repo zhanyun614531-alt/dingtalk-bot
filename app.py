@@ -197,7 +197,7 @@ def generate_dingtalk_signature(timestamp: str, secret: str) -> str:
 #     try:
 #         # 生成文件名
 #         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#         file_name = f"股票分析报告_{stock_name}_{timestamp}.pdf"
+#         file_name = f"Stock_Analysis_Report_{stock_name}_{timestamp}.pdf"
 #
 #         app_logger.info(f"📤 开始上传PDF文件: {file_name}, 大小: {len(pdf_binary)} 字节")
 #
